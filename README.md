@@ -1,5 +1,8 @@
 # CodexRenderer — ODT/TXT → Markdown → HTML (tema Alacritty/Codex)
 
+<img width="738" height="338" alt="image" src="https://github.com/user-attachments/assets/ac41ea2f-e4bd-4e27-997e-d523b2509bb1" />
+
+
 Render de notas/sesiones a **HTML oscuro estilo terminal** (Alacritty/Codex) a partir de `.odt` o `.txt`.
 Aplica reglas semánticas para:
 - **Bloques de código** (`\`\`\`kotlin`, `\`\`\`bash`, `\`\`\`json`, …).
