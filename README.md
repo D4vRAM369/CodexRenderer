@@ -14,6 +14,14 @@
 > Ideal para logs, prompts de IA, diarios técnicos o documentación minimalista.
 
 ---
+## 🖼️ Ejemplos visuales 
+
+Capturas de un archivo `sample.odt` procesado por **CodexRenderer**, mostrando el resultado final en HTML oscuro estilo Alacritty.
+<img width="2440" height="833" alt="image" src="https://github.com/user-attachments/assets/12e68318-5e65-450f-bd85-abe30ae78c39" />
+<img width="2493" height="850" alt="image" src="https://github.com/user-attachments/assets/9f96fcfc-87b0-4d64-a33a-26ce6bcebd5d" />
+
+
+
 
 ## 📁 Estructura del proyecto
 
