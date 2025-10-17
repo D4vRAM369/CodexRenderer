@@ -75,9 +75,9 @@ pre{padding:12px;overflow:auto}
 code{background:#111;padding:0 4px;border-radius:4px}
 pre>code{background:transparent;padding:0}
 .gi{color:#00e676}.gd{color:#ff5252}
-.ait,em{color:#00c853;font-style:italic}
-.q{color:#80d8ff;font-weight:600}        /* preguntas */
-.prompt{color:#ffd54f;font-weight:600}   /* líneas que empiezan por '>' */
+.ait{color:#00c853;font-style:italic}     /* pensamiento IA */
+.q{color:#80d8ff;font-weight:600}         /* preguntas (?…, > PNL …) */
+.prompt{color:#ffd54f;font-weight:600}    /* líneas que empiezan por >, ›, » */
 h1,h2,h3{color:#e6e6e6;margin-top:1.2em}
 CSS
 fi

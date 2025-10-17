@@ -1,14 +1,4 @@
-# venv / caches
 venv/
-.venv/
 __pycache__/
 *.pyc
-
-# salida
-*.html
-*.md
-
-# editores
-.vscode/
-.idea/
-
+*.log
