@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from __future__ import annotations
+
 import os
 import shlex
 import sys
@@ -8,41 +9,107 @@ import html
 import shutil
 import subprocess
 import threading
+import platform
+import argparse
 from pathlib import Path
 from typing import List, Optional
+
 # CodexRenderer GUI — ODT/TXT -> Markdown -> HTML con tema Alacritty/Codex (drag & drop)
 # Requisitos:
 #   - Python 3.10+
 #   - odfpy (para .odt):  pip install odfpy
 #   - pandoc (sistema):   sudo apt install -y pandoc
 #   - (Opcional) tkinterdnd2 para drag&drop nativo: pip install tkinterdnd2
+__version__ = "0.1.1"
 
-__version__ = "0.1.0"
+# ---------------------------------------------------------------------------
+# TKDND bootstrap (soporta layout 'thirdparty/tkdnd/<platform-arch>/tkdnd.tcl')
+# ---------------------------------------------------------------------------
+def _pick_tkdnd_subdir(root: Path) -> Path | None:
+    """
+    Devuelve la subcarpeta adecuada dentro de 'root/tkdnd' según OS/arquitectura,
+    p.ej.: linux-x64, linux-arm64, osx-x64, osx-arm64, win-x64, win-x86, win-arm64.
+    """
+    sysname = sys.platform
+    mach = platform.machine().lower()
 
-def parse_cli():
-    p = argparse.ArgumentParser(add_help=False)
-    # Acepta varias formas: --version, -version y -v
-    p.add_argument('--version', '-version', '-v', action='store_true',
-                   help='Show version and exit')
-    # Si algún día añades más flags, ponlos aquí
-    args, _ = p.parse_known_args()
-    return args
+    if "aarch64" in mach or "arm64" in mach:
+        arch = "arm64"
+    elif mach in ("x86_64", "amd64", "x64"):
+        arch = "x64"
+    elif mach in ("i386", "i686", "x86"):
+        arch = "x86"
+    else:
+        arch = mach  # fallback
 
-def main():
-    # Importar Tkinter SOLO aquí, para que --version no abra la GUI
-    import tkinter as tk
-    from tkinter import filedialog, messagebox, ttk
+    if sysname.startswith("linux"):
+        cand = root / ("linux-" + arch)
+    elif sysname == "darwin":
+        cand = root / ("osx-" + arch)
+    elif sysname.startswith("win"):
+        cand = root / ("win-" + arch)
+    else:
+        cand = None
+
+    if cand and (cand / "tkdnd.tcl").exists():
+        return cand
+    return None
+
+
+def _init_tkdnd_paths() -> str | None:
+    """
+    Establece TKDND_LIBRARY apuntando a la carpeta que contiene 'tkdnd.tcl'.
+    Prioridad:
+      1) vendor en repo: thirdparty/tkdnd/<platform-arch>
+      2) PyInstaller (_MEIPASS): tkdnd/<platform-arch>
+      3) site-packages de tkinterdnd2: tkinterdnd2/tkdnd/<platform-arch>
+    """
+    here = Path(__file__).resolve().parent
+
+    # 1) Vendor en el repo
+    vend_root = here / "thirdparty" / "tkdnd"
+    vend_sub = _pick_tkdnd_subdir(vend_root)
+    if vend_sub:
+        os.environ["TKDND_LIBRARY"] = str(vend_sub)
+        return str(vend_sub)
+
+    # 2) PyInstaller (si se empaqueta con --add-data "thirdparty/tkdnd:tkdnd")
+    if hasattr(sys, "_MEIPASS"):
+        meip_tkdnd = Path(sys._MEIPASS) / "tkdnd"
+        meip_sub = _pick_tkdnd_subdir(meip_tkdnd)
+        if meip_sub:
+            os.environ["TKDND_LIBRARY"] = str(meip_sub)
+            return str(meip_sub)
+
+    # 3) Site-packages de tkinterdnd2
     try:
-        from tkinterdnd2 import DND_FILES, TkinterDnD
-        DND_AVAILABLE = True
+        import importlib.util
+        spec = importlib.util.find_spec("tkinterdnd2")
+        if spec:
+            pkg_dir = Path(spec.origin).parent
+            sp_root = pkg_dir / "tkdnd"
+            sp_sub = _pick_tkdnd_subdir(sp_root)
+            if sp_sub:
+                os.environ["TKDND_LIBRARY"] = str(sp_sub)
+                return str(sp_sub)
     except Exception:
-        DND_AVAILABLE = False
+        pass
 
-if __name__ == "__main__":
-    if "--version" in sys.argv:
-        print(f"CodexRenderer GUI {__version__}")
-        sys.exit(0)
-    main()
+    return None
+
+
+_TKDND_PATH = _init_tkdnd_paths()
+print("TKDND_LIBRARY:", os.environ.get("TKDND_LIBRARY", "(no set)"))
+
+# Importes GUI (tras bootstrap)
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+try:
+    from tkinterdnd2 import TkinterDnD, DND_FILES
+    DND_AVAILABLE = True
+except Exception as e:
+    print("WARN: tkinterdnd2 no disponible o fallo al localizar tkdnd:", e)
+    DND_AVAILABLE = False
 
 # -------- CSS del tema (embebido en <style>) --------
 CODEX_CSS = r"""
@@ -92,9 +159,9 @@ body::before {
 """
 
 # -------- Conversión base (odt/txt -> md -> html) --------
-
 def read_plain_txt(p: Path) -> str:
     return p.read_text(encoding="utf-8", errors="replace")
+
 
 def read_odt(p: Path) -> str:
     """
@@ -109,7 +176,7 @@ def read_odt(p: Path) -> str:
     doc = load(str(p))
     pieces: list[str] = []
 
-    # 1) Recorre párrafos, cabeceras y items de lista
+    # 1) Recorre cabeceras, párrafos e items de lista
     for el in (doc.getElementsByType(H) +
                doc.getElementsByType(P) +
                doc.getElementsByType(ListItem)):
@@ -126,6 +193,7 @@ def read_odt(p: Path) -> str:
             pieces.append(body)
 
     return "\n".join(pieces).strip() + "\n"
+
 
 def to_markdown_with_rules(src_text: str) -> str:
     """
@@ -181,32 +249,91 @@ def to_markdown_with_rules(src_text: str) -> str:
 
     return ("\n".join(out)).rstrip() + "\n"
 
+
 def ensure_pandoc() -> None:
     if shutil.which("pandoc") is None:
         raise RuntimeError("pandoc no encontrado. Instálalo con: sudo apt install -y pandoc")
 
 
-def md_to_html(md_text: str, embed_css: bool = True) -> str:
+def _cmd_str(cmd: list[str]) -> str:
+    """Devuelve el comando listo para copiar/pegar en terminal."""
+    return " ".join(shlex.quote(p) for p in cmd)
+
+
+def md_to_html(
+    md_text: str,
+    embed_css: bool = True,
+    *,
+    toc: bool = True,
+    toc_depth: int = 3,
+    metadata: dict | None = None,
+    highlight: str = "pygments",
+    mathjax: bool = False
+) -> str:
     """
-    Usa pandoc para convertir desde markdown GitHub (gfm) a html5 standalone,
-    luego embebe CSS si aplica.
+    Convierte Markdown (GFM) a HTML5 usando pandoc.
+    - TOC: tabla de contenidos con profundidad configurable.
+    - metadata: title/author/date...
+    - highlight: estilo de resaltado de código (pygments, kate, espresso, etc.)
+    - mathjax: activa soporte de fórmulas.
+    - embed_css: incrusta tu CSS Matrix/Alacritty en <style> dentro del <head>.
     """
     import tempfile
     ensure_pandoc()
+    if metadata is None:
+        from datetime import datetime
+        metadata = {
+            "title": "CodexRenderer Export",
+            "author": "CodexRenderer",
+            "date": datetime.now().strftime("%Y-%m-%d"),
+        }
+
     with tempfile.TemporaryDirectory() as td:
         md_path = Path(td) / "in.md"
         out_path = Path(td) / "out.html"
         md_path.write_text(md_text, encoding="utf-8")
-        cmd = ["pandoc", "--from", "gfm", "--to", "html5", "--standalone", str(md_path), "-o", str(out_path)]
+
+        # Construye el comando pandoc con opciones "pro"
+        cmd = [
+            "pandoc",
+            "--from", "gfm",
+            "--to", "html5",
+            "--standalone",
+        ]
+
+        if toc:
+            cmd += ["--toc", f"--toc-depth={int(toc_depth)}"]
+
+        # Metadatos básicos
+        for k, v in (metadata or {}).items():
+            if v is not None:
+                cmd += ["--metadata", f"{k}={v}"]
+
+        # Resaltado de sintaxis
+        if highlight:
+            cmd += ["--highlight-style", highlight]
+
+        # Soporte opcional de fórmulas
+        if mathjax:
+            cmd += ["--mathjax"]
+
+        cmd += [str(md_path), "-o", str(out_path)]
+
+        # LOG educativo: mostramos el comando exacto (copiable)
+        print("PANDOC:", _cmd_str(cmd))
+
         subprocess.run(cmd, check=True)
         html_str = out_path.read_text(encoding="utf-8", errors="replace")
+
     if embed_css:
         style_tag = f"<style>\n{CODEX_CSS}\n</style>\n"
         if "</head>" in html_str:
             html_str = html_str.replace("</head>", style_tag + "</head>")
         else:
             html_str = style_tag + html_str
+
     return html_str
+
 
 def convert_file(in_file: Path, out_dir: Optional[Path] = None) -> tuple[Path, Path]:
     """
@@ -240,17 +367,6 @@ def convert_file(in_file: Path, out_dir: Optional[Path] = None) -> tuple[Path, P
     return out_md, out_html
 
 # -------- GUI Tkinter --------
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
-
-# drag&drop opcional
-DND_AVAILABLE = False
-try:
-    from tkinterdnd2 import DND_FILES, TkinterDnD
-    DND_AVAILABLE = True
-except Exception:
-    DND_AVAILABLE = False
-
 class CodexGUI:
     def __init__(self):
         if DND_AVAILABLE:
@@ -271,7 +387,7 @@ class CodexGUI:
 
         self.drop_label = tk.Label(
             top,
-            text="Arrastra aquí tus archivos .txt / .odt\n(o usa 'Añadir archivos')",
+            text="Arrastra aquí tus archivos .txt / .odt\n(o haz clic para añadir)",
             relief="groove",
             borderwidth=2,
             height=4,
@@ -279,9 +395,26 @@ class CodexGUI:
         )
         self.drop_label.pack(fill="x")
 
+        # --- Drag & Drop setup robusto (con fallback a clic) ---
         if DND_AVAILABLE:
-            self.drop_label.drop_target_register(DND_FILES)
-            self.drop_label.dnd_bind("<<Drop>>", self.on_drop)
+            try:
+                self.drop_label.drop_target_register(DND_FILES)
+                self.drop_label.dnd_bind("<<Drop>>", self.on_drop)
+
+                def _hover_in(_): self.drop_label.config(bg="#0e2e1c")
+                def _hover_out(_): self.drop_label.config(bg="#101010")
+                self.drop_label.dnd_bind("<<DragEnter>>", _hover_in)
+                self.drop_label.dnd_bind("<<DragLeave>>", _hover_out)
+
+                # También permitimos clic como alternativa
+                self.drop_label.bind("<Button-1>", lambda _e: self.on_add_files())
+            except Exception as e:
+                print("WARN: Falló el registro DnD:", e)
+                self.drop_label.config(text="Drag & drop desactivado.\nHaz clic para añadir archivos…")
+                self.drop_label.bind("<Button-1>", lambda _e: self.on_add_files())
+        else:
+            self.drop_label.config(text="Drag & drop no disponible.\nHaz clic para añadir archivos…")
+            self.drop_label.bind("<Button-1>", lambda _e: self.on_add_files())
 
         btns = ttk.Frame(top)
         btns.pack(fill="x", pady=(10, 0))
@@ -325,6 +458,7 @@ class CodexGUI:
         # Datos
         self.out_dir: Optional[Path] = None
 
+    # ------------- GUI handlers -------------
     def log_print(self, msg: str):
         self.log.insert("end", msg + "\n")
         self.log.see("end")
@@ -339,9 +473,8 @@ class CodexGUI:
             self._add_file(Path(p))
 
     def on_drop(self, event):
-        # tkinterdnd2 pasa rutas separadas por espacios, manejar comillas
+        # tkinterdnd2 pasa rutas separadas por espacios; manejar con {braces}
         raw = event.data
-        # Manejo robusto de rutas arrastradas
         items = self._split_dnd_paths(raw)
         for it in items:
             self._add_file(Path(it))
@@ -424,10 +557,7 @@ class CodexGUI:
         self.status_var.set(f"Terminado. OK={ok}  ERR={fail}")
         self.btn_run.config(state="normal")
 
-# --- CLI flags y punto de entrada (AL FINAL DEL ARCHIVO) ---
-import argparse, sys
-__version__ = "0.1.0"
-
+# -------- CLI / Entry point --------
 def parse_cli():
     p = argparse.ArgumentParser(add_help=False)
     p.add_argument('--version', '-version', '-v', action='store_true',
@@ -436,6 +566,7 @@ def parse_cli():
                    help='Imprime trazas de depuración')
     args, _ = p.parse_known_args()
     return args
+
 
 def main(debug: bool = False):
     if debug:
@@ -454,8 +585,6 @@ def main(debug: bool = False):
         tb = traceback.format_exc()
         print("ERROR en CodexRenderer GUI:\n", tb, flush=True)
         try:
-            import tkinter as tk
-            from tkinter import messagebox
             root = tk.Tk(); root.withdraw()
             messagebox.showerror("CodexRenderer — Error", f"{e}\n\n{tb}")
             root.destroy()
@@ -463,50 +592,6 @@ def main(debug: bool = False):
             pass
         sys.exit(1)
 
-if __name__ == "__main__":
-    args = parse_cli()
-    if args.version:
-        print(f"CodexRenderer GUI {__version__}")
-        sys.exit(0)
-    main(debug=args.debug)
-# --- CLI flags y punto de entrada (AL FINAL DEL ARCHIVO) ---
-import argparse, sys
-__version__ = "0.1.0"
-
-def parse_cli():
-    p = argparse.ArgumentParser(add_help=False)
-    p.add_argument('--version', '-version', '-v', action='store_true',
-                   help='Muestra la versión y sale')
-    p.add_argument('--debug', action='store_true',
-                   help='Imprime trazas de depuración')
-    args, _ = p.parse_known_args()
-    return args
-
-def main(debug: bool = False):
-    if debug:
-        print("DEBUG: entrando en main()")
-    try:
-        if debug:
-            print("DEBUG: creando instancia CodexGUI()")
-        app = CodexGUI()
-        if debug:
-            print("DEBUG: llamando a mainloop()")
-        app.root.mainloop()
-        if debug:
-            print("DEBUG: mainloop() terminó (ventana cerrada)")
-    except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
-        print("ERROR en CodexRenderer GUI:\n", tb, flush=True)
-        try:
-            import tkinter as tk
-            from tkinter import messagebox
-            root = tk.Tk(); root.withdraw()
-            messagebox.showerror("CodexRenderer — Error", f"{e}\n\n{tb}")
-            root.destroy()
-        except Exception:
-            pass
-        sys.exit(1)
 
 if __name__ == "__main__":
     args = parse_cli()
@@ -514,3 +599,4 @@ if __name__ == "__main__":
         print(f"CodexRenderer GUI {__version__}")
         sys.exit(0)
     main(debug=args.debug)
+

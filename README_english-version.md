@@ -1,5 +1,7 @@
 # ⚡️ CodexRenderer — ODT/TXT → Markdown → HTML (Alacritty/Codex theme)
 
+[🇪🇸 Versión en español](README.md)
+
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/License-GPLv3-green)
 ![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey)
