@@ -6,3 +6,8 @@ dist/ build/
 #!thirdparty/vendor/
 #!thirdparty/tkdnd/
 
+.venv*/
+venv/
+out/
+__pycache__/
+*.pyc
