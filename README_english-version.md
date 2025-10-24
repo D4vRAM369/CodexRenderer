@@ -19,21 +19,24 @@
 
 ## 📁 Project structure
 
-```bash
-CodexRenderer/
-├── README.md
-├── requirements.txt
-├── convert_codex.sh
-├── codex_renderer.py
-├── themes/
-│ └── codex.css
-├── samples/
-│ ├── MySession.odt
-│ └── example.txt
-├── .gitignore
-└── .github/ 
-└── workflows/ 
-└── ci.yaml
+ ```bash
+ CodexRenderer/
+ ├── README.md
+ ├── README_english-version.md
+ ├──  requirements.txt
+ ├── run.sh
+ ├── convert_codex.sh
+ ├── convert_gemini.sh
+ ├── codexrenderer_gui.py
+ ├── geminirenderer_core.py
+ ├── geminirenderer_gui.py
+ ├── styles/
+ │ └── gemini.py
+ ├── thirdparty/
+ │ ├── vendor/tkinterdnd2/
+ │ └── tkdnd/linux-x64/
+ └──  .gitignore
+
 ```
 
 ---
@@ -51,6 +54,27 @@ Applies automatic semantic rules on plain text or `.odt` documents to highlight 
 | 💻 **Code blocks** | `````bash ... ````` | Terminal style dark theme |
 
 The **CSS is embedded directly** into the final HTML, guaranteeing the same appearance in any folder or system.
+
+---
+
+## 🌠 Extension: GeminiRenderer GUI
+
+**GeminiRenderer** is the visual evolution of CodexRenderer, with a graphical interface (Tkinter + tkinterdnd2).
+
+It allows you to convert via *Drag & Drop* or multiple selection (`.txt`, `.md`, `.odt`) to Markdown + HTML with the same **Codex/Alacritty** theme.
+
+ ```bash
+./run.sh --debug
+
+📦 Additional Requirements:
+
+sudo apt install -y python3-tk tkdnd pandoc
+
+🧩 Vendorized Dependencies:
+
+thirdparty/vendor/tkinterdnd2/
+
+thirdparty/tkdnd/linux-x64/
 
 ---
 
