@@ -2,24 +2,44 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import argparse
+# =========================
+# PBL-01: vendor path first
+# =========================
+# Si has "vendorizado" paquetes Python dentro del repo (p.ej. tkinterdnd2 en thirdparty/vendor),
+# añádelos a sys.path ANTES de cualquier import del paquete.
 import os
-import platform
 import sys
-import threading
 from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+VENDOR = HERE / "thirdparty" / "vendor"
+if VENDOR.is_dir() and str(VENDOR) not in sys.path:
+    sys.path.insert(0, str(VENDOR))  # ahora importará desde thirdparty/vendor si existe
+
+# Resto de imports de estándar
+import argparse
+import platform
+import threading
 from typing import List, Optional
 
+# Proyecto
 from geminirenderer_core import convert_path, ensure_pandoc
 
-# ---------------------------------------------------------------------------
-# Optional TKDND bootstrap (copiado/adaptado de CodexRenderer)
-# ---------------------------------------------------------------------------
-
+# ============================================================================
+# PBL-02: Bootstrap robusto de TkDND (inspirado en CodexRenderer, extendido)
+# ============================================================================
 def _pick_tkdnd_subdir(root: Path) -> Path | None:
+    """
+    Devuelve la subcarpeta de tkdnd adecuada para la plataforma, si contiene tkdnd.tcl.
+    Convenciones de carpeta soportadas:
+      - linux-x64 / linux-x86 / linux-arm64
+      - win-x64 / win-x86
+      - macos-universal / macos-arm64 / macos-x64
+    """
     sysname = platform.system().lower()
     mach = platform.machine().lower()
 
+    # Normaliza arquitectura
     if "aarch64" in mach or "arm64" in mach:
         arch = "arm64"
     elif mach in ("x86_64", "amd64", "x64"):
@@ -27,42 +47,59 @@ def _pick_tkdnd_subdir(root: Path) -> Path | None:
     elif mach in ("i386", "i686", "x86"):
         arch = "x86"
     else:
-        arch = mach
+        arch = mach  # fallback
 
+    # Candidatos por plataforma
+    candidates: list[Path] = []
     if sysname.startswith("linux"):
-        candidate = root / f"linux-{arch}"
+        candidates += [root / f"linux-{arch}", root / "linux"]
     elif sysname.startswith("darwin"):
-        candidate = root / f"osx-{arch}"
+        # evita nombres antiguos "osx-*"; usa "macos-*"
+        candidates += [
+            root / "macos-universal",
+            root / f"macos-{arch}",
+            root / "macos",
+        ]
     elif sysname.startswith("win"):
-        candidate = root / f"win-{arch}"
-    else:
-        candidate = None
+        candidates += [root / f"win-{arch}", root / "win"]
 
-    if candidate and (candidate / "tkdnd.tcl").exists():
-        return candidate
+    # Fallback directo al root
+    candidates.append(root)
+
+    for c in candidates:
+        if (c / "tkdnd.tcl").exists():
+            return c
     return None
 
 
 def _init_tkdnd_paths() -> str | None:
-    here = Path(__file__).resolve().parent
-    vendor = here / "thirdparty" / "tkdnd"
-    vendor_sub = _pick_tkdnd_subdir(vendor)
+    """
+    Intenta resolver TKDND_LIBRARY en este orden:
+      1) Variable de entorno TKDND_LIBRARY (si ya viene definida externamente).
+      2) thirdparty/tkdnd/<plataforma> dentro del proyecto.
+      3) Carpeta "tkdnd" al lado de tkinterdnd2 en site-packages o vendor.
+      4) Carpeta "tkdnd" incluida en bundles (p.ej. PyInstaller, sys._MEIPASS).
+    Devuelve la ruta establecida o None si no se encontró, pero no falla:
+    la GUI podrá degradar a "sin DnD" con file picker.
+    """
+    # 0) Si ya está puesta por el entorno, respétala
+    env_val = os.environ.get("TKDND_LIBRARY")
+    if env_val:
+        return env_val
+
+    # 1) thirdparty/tkdnd en el repo
+    vendor_root = HERE / "thirdparty" / "tkdnd"
+    vendor_sub = _pick_tkdnd_subdir(vendor_root)
     if vendor_sub:
         os.environ["TKDND_LIBRARY"] = str(vendor_sub)
         return str(vendor_sub)
 
-    if hasattr(sys, "_MEIPASS"):
-        base = Path(sys._MEIPASS) / "tkdnd"
-        sub = _pick_tkdnd_subdir(base)
-        if sub:
-            os.environ["TKDND_LIBRARY"] = str(sub)
-            return str(sub)
-
+    # 2) Paquete tkinterdnd2 (sirve si el propio paquete incluye "tkdnd/")
     try:
         import importlib.util
 
         spec = importlib.util.find_spec("tkinterdnd2")
-        if spec:
+        if spec and spec.origin:
             pkg_dir = Path(spec.origin).parent
             sub = _pick_tkdnd_subdir(pkg_dir / "tkdnd")
             if sub:
@@ -70,25 +107,42 @@ def _init_tkdnd_paths() -> str | None:
                 return str(sub)
     except Exception:
         pass
+
+    # 3) Bundles estilo PyInstaller
+    if hasattr(sys, "_MEIPASS"):
+        base = Path(getattr(sys, "_MEIPASS")) / "tkdnd"  # type: ignore[attr-defined]
+        sub = _pick_tkdnd_subdir(base)
+        if sub:
+            os.environ["TKDND_LIBRARY"] = str(sub)
+            return str(sub)
+
+    # No encontrada (la GUI seguirá sin DnD)
     return None
 
 
 _TKDND_PATH = _init_tkdnd_paths()
 
+# GUI base
 import tkinter as tk  # noqa: E402
 from tkinter import filedialog, messagebox, ttk  # noqa: E402
 
+# Intento de import de tkinterdnd2 (puede salir mal si sólo falta la parte nativa)
 try:  # noqa: E402
     from tkinterdnd2 import DND_FILES, TkinterDnD  # type: ignore
 
     DND_AVAILABLE = True
-except Exception:  # pragma: no cover
+    DND_STATUS_MSG = f"DnD activo ({_TKDND_PATH})" if _TKDND_PATH else "DnD activo (tkdnd global)"
+except Exception as _e:  # pragma: no cover
     DND_AVAILABLE = False
+    DND_STATUS_MSG = f"DnD NO disponible: {_e!s}".splitlines()[0]
 
 
 class GeminiRendererGUI:
     def __init__(self) -> None:
+        # PBL-03: asegura dependencias externas (pandoc) antes de abrir UI
         ensure_pandoc()
+
+        # Crea la raíz en función de DnD
         if DND_AVAILABLE:
             self.root = TkinterDnD.Tk()
         else:
@@ -109,7 +163,6 @@ class GeminiRendererGUI:
         style = ttk.Style()
         bg = "#0f1117"
         fg = "#d9e3ff"
-        accent = "#7aa8ff"
         panel = "#121a2c"
 
         self.root.configure(bg=bg)
@@ -122,6 +175,7 @@ class GeminiRendererGUI:
         top = ttk.Frame(self.root, padding=12)
         top.pack(fill="x")
 
+        # Área de drop / clic
         self.drop_label = tk.Label(
             top,
             text="Arrastra tus exportes Gemini (.txt/.md/.odt)\n(o haz clic para elegir archivos)",
@@ -134,6 +188,7 @@ class GeminiRendererGUI:
         )
         self.drop_label.pack(fill="x")
 
+        # Bindings DnD si está disponible
         if DND_AVAILABLE:
             try:
                 self.drop_label.drop_target_register(DND_FILES)  # type: ignore[attr-defined]
@@ -147,12 +202,20 @@ class GeminiRendererGUI:
 
                 self.drop_label.dnd_bind("<<DragEnter>>", on_enter)
                 self.drop_label.dnd_bind("<<DragLeave>>", on_leave)
-            except Exception:
+            except Exception as e:
+                # Si falla el binding, degrada a clic
                 self.drop_label.config(
-                    text="Drag & Drop no disponible.\nHaz clic para añadir archivos…"
+                    text=f"Drag & Drop no disponible ({e}).\nHaz clic para añadir archivos…"
                 )
+        else:
+            self.drop_label.config(
+                text="Drag & Drop no disponible.\nHaz clic para añadir archivos…"
+            )
+
+        # Clic para file picker siempre activo
         self.drop_label.bind("<Button-1>", lambda _e: self.on_add_files())
 
+        # Botonera superior
         buttons = ttk.Frame(top)
         buttons.pack(fill="x", pady=(10, 0))
         self.btn_add = ttk.Button(buttons, text="Añadir archivos…", command=self.on_add_files)
@@ -169,6 +232,7 @@ class GeminiRendererGUI:
         self.outdir_var = tk.StringVar(value="(misma carpeta)")
         ttk.Label(buttons, textvariable=self.outdir_var).pack(side="left", padx=10)
 
+        # Lista de archivos
         mid = ttk.Frame(self.root, padding=12)
         mid.pack(fill="both", expand=True)
 
@@ -189,15 +253,18 @@ class GeminiRendererGUI:
         scroll.pack(side="left", fill="y")
         self.files_list.configure(yscrollcommand=scroll.set)
 
+        # Barra inferior
         bottom = ttk.Frame(self.root, padding=12)
         bottom.pack(fill="x")
 
         self.btn_run = ttk.Button(bottom, text="Render", command=self.on_run)
         self.btn_run.pack(side="left")
 
-        self.status_var = tk.StringVar(value="Listo.")
+        # Estado: muestra si DnD está activo y qué ruta se usa
+        self.status_var = tk.StringVar(value=f"Listo. {DND_STATUS_MSG}")
         ttk.Label(bottom, textvariable=self.status_var).pack(side="left", padx=10)
 
+        # Log
         self.log = tk.Text(
             self.root,
             height=10,
@@ -266,7 +333,7 @@ class GeminiRendererGUI:
             except Exception as exc:  # pragma: no cover - UI feedback
                 self.log_print(f"  ✖ ERROR: {exc}")
                 fail += 1
-        self.status_var.set(f"Terminado. OK={ok} ERR={fail}")
+        self.status_var.set(f"Terminado. OK={ok} ERR={fail} — {DND_STATUS_MSG}")
         self.btn_run.config(state="normal")
 
     # ------------------------------------------------------------ Utilities --
@@ -288,6 +355,7 @@ class GeminiRendererGUI:
 
     @staticmethod
     def _split_dnd_paths(raw: str) -> List[str]:
+        # Parser Tk DnD para rutas con espacios {...}
         out: List[str] = []
         buf = ""
         in_brace = False
@@ -326,6 +394,8 @@ __version__ = "0.1.0"
 def main(debug: bool = False) -> None:
     if debug:
         print("DEBUG: iniciando GeminiRenderer GUI")
+        print("DEBUG: TKDND_LIBRARY =", os.environ.get("TKDND_LIBRARY"))
+        print("DEBUG: DND_AVAILABLE =", DND_AVAILABLE, "|", DND_STATUS_MSG)
     try:
         app = GeminiRendererGUI()
         if debug:
@@ -352,3 +422,4 @@ if __name__ == "__main__":
         print(f"GeminiRenderer GUI {__version__}")
     else:
         main(debug=args.debug)
+
