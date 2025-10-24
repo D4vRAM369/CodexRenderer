@@ -7,39 +7,45 @@
 ![Made_with](https://img.shields.io/badge/Made_with-Love_&_Coffee-ff69b4)
 [![coffee](https://img.shields.io/badge/Buy_me_a_coffee-☕-5F7FFF)](https://www.buymeacoffee.com/D4vRAM369)
 
-
 <img width="891" height="620" alt="CodexRenderer preview" src="https://github.com/user-attachments/assets/aacffd84-bf30-455a-84c9-c46a8828b4b1" />
 
-> 🧠 **Convierte sesiones enteras de Codex en CLI copiadas y pegadas** en `.odt` o `.txt` a un **HTML oscuro estilo terminal** (Alacritty/Codex).\
+> 🧠 **Convierte sesiones enteras de Codex en CLI copiadas y pegadas** en `.odt` o `.txt` a un **HTML oscuro estilo terminal** (Alacritty/Codex).  
 > Ideal para logs, prompts de IA, diarios técnicos o documentación minimalista.
 
 ---
+
 ## 🖼️ Ejemplos visuales 
 
 Capturas de un archivo `sample.odt` procesado por **CodexRenderer**, mostrando el resultado final en HTML oscuro estilo Alacritty.
+
 <img width="2440" height="833" alt="image" src="https://github.com/user-attachments/assets/12e68318-5e65-450f-bd85-abe30ae78c39" />
 <img width="2493" height="850" alt="image" src="https://github.com/user-attachments/assets/9f96fcfc-87b0-4d64-a33a-26ce6bcebd5d" />
 
-
-
+---
 
 ## 📁 Estructura del proyecto
 
 ```bash
 CodexRenderer/
 ├── README.md
+├── README_english-version.md
 ├── requirements.txt
+├── run.sh
 ├── convert_codex.sh
-├── codex_renderer.py
-├── themes/
-│   └── codex.css
+├── convert_gemini.sh
+├── codexrenderer_gui.py
+├── geminirenderer_core.py
+├── geminirenderer_gui.py
+├── styles/
+│   └── gemini.py
 ├── samples/
-│   ├── MiSesion.odt
-│   └── ejemplo.txt
-├── .gitignore
-└── .github/
-    └── workflows/
-        └── ci.yaml
+│   └── ejemplo.odt
+├── thirdparty/
+│   ├── vendor/tkinterdnd2/
+│   └── tkdnd/linux-x64/
+└── .gitignore
+
+
 ```
 
 ---
@@ -59,6 +65,28 @@ Aplica reglas semánticas automáticas sobre el texto plano o documentos `.odt` 
 El **CSS se embebe directamente** en el HTML final, garantizando un mismo aspecto en cualquier carpeta o sistema.
 
 ---
+
+## 🌠 Extensión: GeminiRenderer GUI
+
+**GeminiRenderer** es la evolución visual de CodexRenderer, con interfaz gráfica (Tkinter + tkinterdnd2).  
+Permite convertir por *Drag & Drop* o selección múltiple (`.txt`, `.md`, `.odt`) a Markdown + HTML con el mismo tema **Codex/Alacritty**.
+
+```bash
+./run.sh --debug
+
+📦 Requisitos adicionales:
+
+sudo apt install -y python3-tk tkdnd pandoc
+
+
+🧩 Dependencias vendorizadas:
+
+thirdparty/vendor/tkinterdnd2/
+
+thirdparty/tkdnd/linux-x64/
+
+---
+
 
 ## ⚙️ Requisitos
 
