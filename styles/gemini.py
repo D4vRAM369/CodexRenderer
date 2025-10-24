@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 Modo Gemini para CodexRenderer:
-- Entrada: texto plano (export/log) o .odt (ya lo maneja el lector .odt del proyecto)
-- Salida intermedia: Markdown "rico" (etiquetas HTML mínimas embebidas donde compensa)
-- Salida final opcional: HTML con CSS Gemini (gradiente, cards, diff, callouts)
+- Entrada: transcript plano (export/log) o .odt
+- Salida intermedia: Markdown enriquecido emulando el estilo visual de GeminiCLI
+- Salida final: HTML con CSS que replica colores, paneles y resaltados del cliente Gemini
 """
 
 from __future__ import annotations
@@ -12,68 +12,179 @@ import html
 
 # ---------- COLORES / TEMA ----------
 GEMINI_CSS = r"""
-:root{
-  --bg:#0b0c10;
-  --fg:#dfe7ff;
-  --muted:#a7b3d1;
-  --ok:#87ff87;
-  --warn:#ffd75f;
-  --err:#ff6b6b;
-  --accent1:#7aa2f7;  /* azul */
-  --accent2:#bb9af7;  /* violeta */
-  --accent3:#2ac3de;  /* cian */
-  --box:#11131a;
-  --box-border:#1b2030;
-  --code-bg:#0f1320;
+:root {
+  --bg: #0f1117;
+  --fg: #d9e3ff;
+  --muted: #96a1c4;
+  --accent-blue: #7aa8ff;
+  --accent-purple: #bd8bff;
+  --accent-pink: #ff7dcb;
+  --accent-cyan: #3ad7ff;
+  --panel-bg: #121a2c;
+  --panel-border: #1f2740;
+  --panel-shadow: rgba(6, 9, 16, 0.6);
+  --code-bg: #151f33;
+  --user-bg: rgba(255, 215, 120, 0.08);
+  --user-border: rgba(255, 215, 120, 0.35);
+  --diff-add-bg: rgba(122, 201, 108, 0.22);
+  --diff-add-fg: #dfffd1;
+  --diff-del-bg: rgba(255, 118, 118, 0.22);
+  --diff-del-fg: #ffd8d8;
+  --diff-meta-bg: rgba(90, 110, 160, 0.25);
 }
-html,body{
-  background:var(--bg);
-  color:var(--fg);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  line-height:1.65; margin:0; padding:2rem 1.25rem 4rem;
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+  line-height: 1.65;
+  margin: 0;
+  padding: 2rem 1.75rem 4rem;
 }
-a{ color:var(--accent3); text-decoration:none; border-bottom:1px dotted var(--accent3); }
-a:hover{ color:var(--accent2); border-bottom-color:var(--accent2); }
-
-h1,h2,h3{ color:var(--accent2); letter-spacing:0.3px; }
-pre, code{ background:var(--code-bg); color:var(--fg); }
-pre{ padding:0.9rem 1rem; border-radius:12px; overflow:auto; border:1px solid #1e2438; }
-
-.banner{
-  width:100%; margin:0 0 1rem; padding:0.8rem 0 1.2rem;
-  background:linear-gradient(90deg, #7aa2f7 0%, #bb9af7 50%, #2ac3de 100%);
-  -webkit-background-clip:text; background-clip:text; color:transparent;
-  font-weight:800; font-size:56px; line-height:0.9; letter-spacing:2px;
-  text-shadow:0 0 14px rgba(42,195,222,.15);
-  user-select:none;
+a {
+  color: var(--accent-cyan);
+  text-decoration: none;
+  border-bottom: 1px dotted rgba(58, 215, 255, 0.6);
 }
-
-.callout{
-  background:var(--box); border:1px solid var(--box-border);
-  border-left:4px solid var(--accent3);
-  padding:1rem 1rem; border-radius:10px; margin:1rem 0;
+a:hover {
+  color: var(--accent-purple);
+  border-bottom-color: rgba(189, 139, 255, 0.8);
 }
-.card{
-  background:var(--box); border:1px solid var(--box-border);
-  padding:0.6rem 0.9rem; border-radius:10px; margin:1rem 0;
+p { margin: 0 0 1rem; }
+ul, ol { margin: 0 0 1rem 1.4rem; }
+li { margin-bottom: 0.35rem; }
+hr {
+  border: none;
+  border-top: 1px solid var(--panel-border);
+  margin: 2.2rem 0;
 }
-.card .title{
-  font-weight:700; color:var(--accent1); margin-bottom:0.4rem;
+pre, code {
+  background: var(--code-bg);
+  color: var(--fg);
+  border-radius: 10px;
 }
-.badge{
-  display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px;
-  border:1px solid var(--box-border); background:rgba(122,162,247,.1); color:var(--accent1);
-  margin-right:6px;
+pre {
+  padding: 1rem 1.15rem;
+  overflow: auto;
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 0 0 1px rgba(26, 34, 54, 0.35);
 }
-.diff{ border-radius:8px; overflow:hidden; border:1px solid #2a314a; }
-.diff .add{ background:#0f1b12; color:#b4f7b4; }
-.diff .del{ background:#1b1111; color:#f7b4b4; }
-.diff .line{ padding:2px 10px; white-space:pre-wrap; font-family:inherit; }
-.ia{ color:#c9b6ff; }            /* razonamiento Gemini */
-.user-qa{ font-weight:700; color:#ffea70; }  /* > tus líneas */
-.code-kotlin .kw{ color:#7aa2f7; font-weight:700; }   /* var, by, fun... */
-.code-kotlin .lit{ color:#2ac3de; }                   /* null, true, false */
-.code-kotlin .type{ color:#bb9af7; }                  /* String, Int... */
+code {
+  padding: 0.15rem 0.4rem;
+  border: 1px solid rgba(31, 39, 64, 0.6);
+}
+.banner {
+  width: 100%;
+  margin: -0.7rem 0 1.9rem;
+  text-transform: uppercase;
+  font-size: 58px;
+  letter-spacing: 1.8px;
+  font-weight: 900;
+  color: transparent;
+  background-image: linear-gradient(90deg, #63a8ff 0%, #b681ff 55%, #ff7ac4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow: 0 0 22px rgba(75, 145, 255, 0.35);
+}
+.user-qa {
+  margin: 1.6rem 0;
+  padding: 0.95rem 1.15rem;
+  border-radius: 12px;
+  background: var(--user-bg);
+  color: #ffe58f;
+  border: 1px solid var(--user-border);
+  border-left: 4px solid #ffdf70;
+  font-weight: 650;
+  box-shadow: 0 10px 28px rgba(12, 10, 2, 0.25);
+}
+.user-qa .lead {
+  color: #fff3c4;
+  margin-right: 0.6rem;
+}
+.user-qa br { line-height: 1.7; }
+.ia {
+  margin: 1.5rem 0;
+  color: #d4c2ff;
+  font-style: italic;
+}
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  margin: 1.75rem 0;
+  box-shadow: 0 18px 45px var(--panel-shadow);
+  overflow: hidden;
+}
+.panel-title {
+  padding: 1rem 1.2rem 0.6rem;
+  font-weight: 700;
+  color: var(--accent-blue);
+  letter-spacing: 0.4px;
+}
+.panel-info .panel-title { color: var(--accent-cyan); }
+.panel-command .panel-title { color: var(--accent-purple); }
+.panel-body {
+  padding: 0.35rem 1.2rem 1.2rem;
+}
+.panel-line {
+  white-space: pre;
+  font-family: inherit;
+  padding: 0.32rem 0.75rem;
+  border-radius: 7px;
+  margin: 0.05rem 0;
+  line-height: 1.5;
+  background: transparent;
+  border: 1px solid transparent;
+}
+.panel-line:first-child { margin-top: 0; }
+.panel-line:last-child { margin-bottom: 0; }
+.panel-line.empty {
+  min-height: 0.9rem;
+}
+.panel-diff .panel-line.diff-add {
+  background: var(--diff-add-bg);
+  color: var(--diff-add-fg);
+}
+.panel-diff .panel-line.diff-del {
+  background: var(--diff-del-bg);
+  color: var(--diff-del-fg);
+}
+.panel-diff .panel-line.diff-meta {
+  background: var(--diff-meta-bg);
+  color: var(--muted);
+  font-style: italic;
+}
+.panel-command .panel-line {
+  background: rgba(122, 168, 255, 0.08);
+  color: var(--fg);
+  border-color: rgba(49, 70, 120, 0.35);
+}
+.panel-info .panel-line {
+  background: rgba(42, 195, 222, 0.08);
+  color: var(--fg);
+  border-color: rgba(42, 195, 222, 0.18);
+}
+.panel-line strong { color: inherit; }
+blockquote {
+  border-left: 4px solid rgba(122, 168, 255, 0.35);
+  background: rgba(17, 26, 44, 0.7);
+  padding: 0.85rem 1.2rem;
+  border-radius: 10px;
+  margin: 1.6rem 0;
+  color: var(--muted);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+}
+th, td {
+  border: 1px solid var(--panel-border);
+  padding: 0.6rem 0.8rem;
+}
+th {
+  background: rgba(122, 168, 255, 0.15);
+  color: var(--accent-blue);
+}
 """
 
 # --- helpers de coloreado mínimo para ver azul/violeta en HTML ---
@@ -88,80 +199,294 @@ def _colorize_kotlin(code:str)->str:
     code = re.sub(_TYPE, r'<span class="type">\1</span>', code)
     return code
 
-# ---------- Transformación de texto -> Markdown con “componentes” Gemini ----------
-def to_markdown_gemini(src:str, title:str="GEMINI")->str:
-    """
-    Reglas:
-      - Inserta banner “GEMINI” (HTML) al inicio (en MD se permite HTML crudo).
-      - Líneas de usuario que empiezan por '> ' -> <span class="user-qa">...</span>
-      - Bloques con encabezado 'Edit ', 'WriteFile ', 'ReadManyFiles ' -> .card con .title
-      - Rachas + / - contiguas -> bloque .diff con .add/.del
-      - Viñetas de razonamiento con '✦' o '•' -> <span class="ia">...</span>
-      - Respeta bloques ```lang existentes; añade coloreado HTML simple para kotlin si pedimos HTML luego.
-    """
-    out: List[str] = []
-    out.append(f'<div class="banner">{html.escape(title)}</div>')
-    lines = src.splitlines()
-    i=0
-    in_code=False
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
-    def is_fence(s:str)->bool:
+# ---------- Transformación de texto -> Markdown con “componentes” Gemini ----------
+def to_markdown_gemini(src: str, title: str = "GEMINI") -> str:
+    """
+    Convierte un log/export de Gemini CLI a Markdown con HTML embebido que replica su estilo.
+    - Renderiza el banner superior.
+    - Reconoce bloques de panel (╭ ╮ ... ╰ ╯) y los transforma en tarjetas .panel.
+    - Destaca mensajes del usuario (> …) y pensamientos IA (✦/• …).
+    - Agrupa fragmentos de código y diffs para que conserven indentación.
+    """
+    lines = src.splitlines()
+    total = len(lines)
+    out: List[str] = [f'<div class="banner">{html.escape(title)}</div>']
+    i = 0
+    in_fence = False
+    skipping_ascii_art = True
+
+    def is_fence(s: str) -> bool:
         return s.strip().startswith("```")
 
-    while i < len(lines):
-        ln = lines[i]
+    def strip_ansi(s: str) -> str:
+        return ANSI_RE.sub("", s)
 
-        # cercas
-        if is_fence(ln):
-            out.append(ln)
-            in_code = not in_code
-            i+=1
+    def looks_like_code_line(line: str) -> bool:
+        raw = strip_ansi(line)
+        stripped = raw.lstrip()
+        if not stripped:
+            return False
+        if raw.startswith(("    ", "\t")):
+            return True
+        if stripped.startswith(("android:", "app:", "tools:", "xmlns:", "<", "</", "<?", "#include", "#define")):
+            return True
+        if stripped.startswith((
+            "val ", "var ", "fun ", "class ", "object ", "data ", "sealed ",
+            "enum ", "def ", "async def ", "lambda ", "public ", "private ", "protected ",
+            "override ", "static ", "const ", "final ", "return ", "if ", "else ", "elif ",
+            "switch ", "case ", "when ", "try ", "catch ", "finally ", "for ", "while "
+        )):
+            return True
+        if stripped.startswith(("using ", "namespace ", "package ", "import ")):
+            return True
+        if stripped[0].isdigit():
+            pos = 0
+            while pos < len(stripped) and stripped[pos].isdigit():
+                pos += 1
+            if pos < len(stripped) and stripped[pos] in ('.', ')', ':'):
+                return False  # lista numerada normal
+            tail = stripped[pos:].lstrip()
+            if not tail:
+                return False
+            if tail.startswith((
+                "<", "{", "}", "fun", "val", "var", "if", "when", "switch",
+                "case", "return", "android:", "Material", "ImageButton", "LinearLayout"
+            )):
+                return True
+            if any(ch in tail for ch in "=;{}()<>[]"):
+                return True
+        if "=" in stripped and any(op in stripped for op in ("==", "!=", "<=", ">=", ":=", "->")) and any(
+            sym in stripped for sym in ("(", ")", "{", "}", ";", "<", ">", "[", "]")
+        ):
+            return True
+        if stripped.endswith("{") and ":" in stripped:
+            return True
+        return False
+
+    def render_panel(box_lines: List[str]) -> str:
+        cleaned = [strip_ansi(line) for line in box_lines]
+        if len(cleaned) >= 2 and cleaned[0].startswith(("╭", "┌")) and cleaned[-1].startswith(("╰", "└")):
+            rows: List[str] = []
+            buffer = ""
+            for raw in cleaned[1:-1]:
+                segment = raw
+                if segment.startswith("│"):
+                    segment = segment[1:]
+                if segment.endswith("│"):
+                    segment = segment[:-1]
+                    buffer += segment
+                    candidate = buffer.rstrip()
+                    if candidate:
+                        rows.append(candidate)
+                    buffer = ""
+                else:
+                    if segment.strip():
+                        buffer += segment + " "
+                    else:
+                        if buffer:
+                            rows.append(buffer.rstrip())
+                            buffer = ""
+            if buffer.rstrip():
+                rows.append(buffer.rstrip())
+            inner = rows
+        else:
+            inner = cleaned
+
+        title_text = ""
+        body_lines: List[str] = []
+        for entry in inner:
+            if not title_text:
+                if entry.strip():
+                    title_text = entry.strip()
+                continue
+            if not body_lines and entry.strip() == "":
+                continue
+            body_lines.append(entry)
+
+        classes: List[str] = ["panel"]
+        title_lower = title_text.lower()
+        if any(token in title_lower for token in ("edit", "diff", "patch")):
+            classes.append("panel-diff")
+        elif any(token in title_lower for token in ("shell", "command", "run ", "python", "bash")):
+            classes.append("panel-command")
+        elif any(token in title_lower for token in ("read", "write", "result", "files", "plan", "apply", "export")):
+            classes.append("panel-info")
+
+        html_parts: List[str] = [f'<div class="{" ".join(classes)}">']
+        if title_text:
+            html_parts.append(f'<div class="panel-title">{html.escape(title_text)}</div>')
+        if body_lines:
+            html_parts.append('<div class="panel-body">')
+            for raw in body_lines:
+                raw_clean = strip_ansi(raw.rstrip())
+                if not raw_clean.strip():
+                    continue
+                trimmed_numeric = raw_clean.lstrip(" 0123456789")
+                line_cls = "panel-line"
+                if trimmed_numeric.startswith("+"):
+                    line_cls += " diff-add"
+                elif trimmed_numeric.startswith("-"):
+                    if "panel-command" in classes and trimmed_numeric.startswith("- "):
+                        line_cls += " cmd"
+                    else:
+                        line_cls += " diff-del"
+                elif trimmed_numeric.startswith("@@") or trimmed_numeric.startswith("diff --") or trimmed_numeric.startswith("index "):
+                    line_cls += " diff-meta"
+                elif trimmed_numeric.startswith(("---", "+++", "? ", "~ ")):
+                    line_cls += " diff-meta"
+                html_parts.append(f'<div class="{line_cls}">{html.escape(raw_clean)}</div>')
+            html_parts.append("</div>")
+        html_parts.append("</div>")
+        return "\n".join(html_parts)
+
+    def consume_panel(start: int) -> tuple[str, int]:
+        box: List[str] = [lines[start]]
+        idx = start + 1
+        while idx < total:
+            box.append(lines[idx])
+            if lines[idx].startswith(("╰", "└")):
+                idx += 1
+                break
+            idx += 1
+        return render_panel(box), idx
+
+    def render_user(block: List[str]) -> str:
+        if not block:
+            return ""
+        segments: List[str] = []
+        for idx, raw in enumerate(block):
+            text = strip_ansi(raw)
+            if idx == 0:
+                text = text.lstrip()
+                if text.startswith(">"):
+                    text = text[1:].lstrip()
+            else:
+                text = text.strip()
+            segments.append(text)
+        while segments and not segments[-1].strip():
+            segments.pop()
+        if not segments:
+            return ""
+        escaped = [html.escape(seg) if seg else "&nbsp;" for seg in segments]
+        first = escaped[0]
+        rest = escaped[1:]
+        body = first if not rest else f"{first}<br/>" + "<br/>".join(rest)
+        return f'<div class="user-qa"><span class="lead">&gt;</span>{body}</div>'
+
+    def render_thought(block: List[str]) -> str:
+        if not block:
+            return ""
+        cleaned: List[str] = []
+        for idx, raw in enumerate(block):
+            text = strip_ansi(raw)
+            if idx == 0:
+                text = text.lstrip()
+                if text and text[0] in ("✦", "•"):
+                    text = text[1:].lstrip()
+            else:
+                text = text.strip()
+            cleaned.append(text)
+        while cleaned and not cleaned[-1].strip():
+            cleaned.pop()
+        if not cleaned:
+            return ""
+        escaped = [html.escape(seg) if seg else "&nbsp;" for seg in cleaned]
+        body = escaped[0] if len(escaped) == 1 else escaped[0] + "<br/>" + "<br/>".join(escaped[1:])
+        return f'<div class="ia">✦ {body}</div>'
+
+    while i < total:
+        line = lines[i]
+        raw_line = strip_ansi(line)
+
+        if skipping_ascii_art:
+            if not raw_line.strip():
+                i += 1
+                continue
+            if all(ch in "░█▓▒▌▐▀▄─ " for ch in raw_line):
+                i += 1
+                continue
+            if raw_line.strip().upper() == "GEMINI":
+                i += 1
+                continue
+            skipping_ascii_art = False
+
+        if is_fence(raw_line):
+            out.append(raw_line)
+            in_fence = not in_fence
+            i += 1
             continue
-        if in_code:
-            out.append(ln)
-            i+=1; continue
-
-        # usuario
-        if ln.startswith(">"):
-            content = ln[1:].lstrip()
-            out.append(f'<div class="user-qa">&gt; {html.escape(content)}</div>')
-            i+=1; continue
-
-        # tarjetas conocidas
-        if ln.startswith(("Edit ", "WriteFile ", "ReadManyFiles ")):
-            title = html.escape(ln.strip())
-            out.append(f'<div class="card"><div class="title">{title}</div>')
-            i+=1
-            # acumula hasta línea en blanco o otra tarjeta
-            block=[]
-            while i<len(lines) and lines[i].strip()!="" and not lines[i].startswith(("Edit ","WriteFile ","ReadManyFiles ")):
-                block.append(lines[i]); i+=1
-            # deja el contenido como código “markdown” para preservar sangría
-            body = "\n".join(block)
-            out.append("\n\n```\n" + body + "\n```\n</div>")
+        if in_fence:
+            out.append(raw_line)
+            i += 1
             continue
 
-        # diff (+/-) contiguo
-        if ln.startswith(("+","-")) and not ln.startswith(("+++", "---")):
-            adds=[]; dels=[]; chunk=[]
-            while i<len(lines) and lines[i].startswith(("+","-")) and not lines[i].startswith(("+++", "---")):
-                chunk.append(lines[i]); i+=1
-            out.append('<div class="diff">')
-            for c in chunk:
-                cls = "add" if c.startswith("+") else "del"
-                out.append(f'<div class="line {cls}">{html.escape(c)}</div>')
-            out.append("</div>")
+        if raw_line.startswith(("╭", "┌")):
+            panel_html, i = consume_panel(i)
+            out.append(panel_html)
             continue
 
-        # razonamiento
-        if ln.strip().startswith(("✦","•")):
-            out.append(f'<div class="ia">{html.escape(ln)}</div>')
-            i+=1; continue
+        if not raw_line.strip():
+            out.append("")
+            i += 1
+            continue
 
-        out.append(ln)
-        i+=1
+        if raw_line.lstrip().startswith(">"):
+            block = [line]
+            i += 1
+            while i < total:
+                nxt_raw = strip_ansi(lines[i])
+                if not nxt_raw.strip():
+                    block.append("")
+                    i += 1
+                    break
+                if nxt_raw.lstrip().startswith(("╭", "┌", "✦", "•", ">")):
+                    break
+                block.append(lines[i])
+                i += 1
+            out.append(render_user(block))
+            continue
 
-    md = "\n".join(out).rstrip()+"\n"
+        if raw_line.lstrip().startswith(("✦", "•")):
+            block = [line]
+            i += 1
+            while i < total:
+                nxt_raw = strip_ansi(lines[i])
+                if not nxt_raw.strip():
+                    block.append("")
+                    i += 1
+                    break
+                if nxt_raw.lstrip().startswith(("╭", "┌", "✦", "•", ">")):
+                    break
+                block.append(lines[i])
+                i += 1
+            out.append(render_thought(block))
+            continue
+
+        if looks_like_code_line(line):
+            block = [strip_ansi(line)]
+            i += 1
+            while i < total:
+                nxt = lines[i]
+                nxt_raw = strip_ansi(nxt)
+                if looks_like_code_line(nxt) or not nxt_raw.strip():
+                    block.append(nxt_raw)
+                    i += 1
+                    continue
+                break
+            while block and not block[-1].strip():
+                block.pop()
+            if block:
+                out.append("```")
+                out.extend(block)
+                out.append("```")
+            continue
+
+        out.append(raw_line)
+        i += 1
+
+    md = "\n".join(out).rstrip() + "\n"
     return md
 
 # ---------- enriquecimiento específico para HTML (kotlin) ----------
@@ -177,4 +502,3 @@ def postprocess_html_for_kotlin(html_str:str)->str:
 
 def gemini_css()->str:
     return GEMINI_CSS
-
