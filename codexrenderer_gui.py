@@ -122,6 +122,7 @@ CODEX_CSS = r"""
   --warning: #ffb86c;
   --red: #ff5555;
   --green: #4dff88;
+  --question: #ffe066;
 }
 html, body {
   background: var(--bg);
@@ -144,6 +145,19 @@ pre {
   padding: 0.9rem 1rem; border-radius: 10px; overflow-x: auto;
   box-shadow: inset 0 0 22px rgba(0,255,80,0.1);
   border: 1px solid rgba(0,255,120,0.18);
+}
+blockquote {
+  margin: 1.1rem 0;
+  padding: 0.85rem 1.1rem;
+  border-left: 4px solid rgba(255, 224, 102, 0.75);
+  background: rgba(255, 224, 102, 0.08);
+  color: var(--question);
+  font-weight: 700;
+}
+blockquote p {
+  margin: 0;
+  color: inherit;
+  font-weight: inherit;
 }
 table { border-collapse: collapse; width: 100%; }
 th, td { border: 1px solid rgba(0,255,120,0.12); padding: .5rem .65rem; }
@@ -200,6 +214,8 @@ def to_markdown_with_rules(src_text: str) -> str:
     Reglas:
       - Rachas de líneas que empiezan por '+' o '-' -> bloque ```diff
       - Líneas que empiezan por '•' -> *<span class="ia-thought">...</span>*
+      - Líneas que comienzan con '›' -> cita Markdown (pregunta destacada)
+      - Heurística para agrupar código/CLI en bloques ``` para preservar indentación
       - Respeta bloques ```lang existentes
     """
     lines = src_text.splitlines()
@@ -224,6 +240,67 @@ def to_markdown_with_rules(src_text: str) -> str:
             out.append(line)
             i += 1
             continue
+
+        # preguntas marcadas con '›' (compatibilidad con exportes anteriores)
+        if line.lstrip().startswith("›"):
+            block: list[str] = []
+            while i < len(lines) and lines[i].lstrip().startswith("›"):
+                content = lines[i].lstrip()[1:].lstrip()
+                block.append(f"> {content}")
+                i += 1
+            if out and out[-1].strip():
+                out.append("")
+            out.extend(block)
+            if i < len(lines) and lines[i].strip():
+                out.append("")
+            continue
+
+        def looks_like_code(s: str) -> bool:
+            stripped = s.lstrip()
+            if not stripped:
+                return False
+            if s.startswith(("    ", "\t")):
+                return True
+            if s.startswith("  ") and any(tok in stripped for tok in ("=", "->", "=>", "(", ")", "{", "}", ";", "::")):
+                return True
+            if stripped[0].isdigit() and any(tok in stripped for tok in ("=", "->", "=>", ".", "(", ")", "{", "}", ":" )):
+                return True
+            code_prefixes = (
+                "val ", "var ", "fun ", "class ", "object ", "data ", "sealed ",
+                "def ", "async def ", "import ", "from ", "return ", "if ", "elif ",
+                "else:", "for ", "while ", "case ", "when ", "switch ", "try ",
+                "catch ", "finally", "public ", "private ", "protected ", "static ",
+                "const ", "let ", "function ", "#include", "#define", "#!/bin", "@",
+                "package ", "using ", "namespace ", "map ", "list ", "new "
+            )
+            if any(stripped.startswith(prefix) for prefix in code_prefixes):
+                return True
+            if stripped.startswith(("//", "/*", "*/", "#", "--", ";", "}")):
+                return True
+            punct_tokens = ("=", "->", "=>", "(", ")", "{", "}", ";", "::", "++", "--", "/*", "*/", ":")
+            if any(tok in stripped for tok in punct_tokens):
+                symbolic = sum(ch in "{}[]()=;,:<>+-*/%&|.^" for ch in stripped)
+                return symbolic >= max(2, len(stripped) // 7)
+            return False
+
+        if looks_like_code(line):
+            block: list[str] = []
+            start = i
+            while i < len(lines) and (looks_like_code(lines[i]) or not lines[i].strip() or lines[i].strip().isdigit()):
+                block.append(lines[i])
+                i += 1
+            while block and not block[-1].strip():
+                block.pop()
+            if block:
+                if out and out[-1].strip():
+                    out.append("")
+                out.append("```")
+                out.extend(block)
+                out.append("```")
+                if i < len(lines) and lines[i].strip():
+                    out.append("")
+                continue
+            i = start
 
         # bloque diff contiguo
         if line.startswith(("+", "-")) and not line.startswith(("+++", "---")):
@@ -599,4 +676,3 @@ if __name__ == "__main__":
         print(f"CodexRenderer GUI {__version__}")
         sys.exit(0)
     main(debug=args.debug)
-
