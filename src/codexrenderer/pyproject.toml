@@ -1,0 +1,25 @@
+[project]
+name = "codexrenderer"
+version = "0.2.0"
+description = "ODT/TXT → Markdown → HTML (tema Alacritty/Codex) + Launcher de IA"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "GPL-3.0-or-later"}
+authors = [{name="D4vRAM369"}]
+dependencies = [
+  "odfpy>=1.4.1",           # para leer .odt
+  "tkinterdnd2>=0.4.2; platform_system!='Windows'",  # opcional DnD (Linux)
+]
+
+[project.scripts]
+codex-runner = "codexrenderer.launcher:main"
+codexrenderer = "codexrenderer.codexrenderer_gui:main"
+gemini-cli    = "codexrenderer.gemini_cli:main"
+claude-cli    = "codexrenderer.claudecode_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+codexrenderer = ["assets/*", "styles/*", "*.css"]
+

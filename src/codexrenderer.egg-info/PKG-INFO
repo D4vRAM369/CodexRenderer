@@ -1,3 +1,23 @@
+Metadata-Version: 2.4
+Name: codexrenderer
+Version: 0.2.0
+Summary: CodexRenderer & GeminiRenderer: ODT/TXT → Markdown/HTML con tema tipo terminal (CLI y GUI).
+Author-email: D4vRAM <d4vram369@proton.me>
+License: GPL-3.0-only
+Project-URL: Homepage, https://github.com/D4vRAM369/CodexRenderer
+Project-URL: Issues, https://github.com/D4vRAM369/CodexRenderer/issues
+Keywords: odt,markdown,html,pandoc,renderer,cli,tkinter,gui
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: GNU General Public License v3 (GPLv3)
+Classifier: Environment :: Console
+Classifier: Environment :: Win32 (MS Windows)
+Classifier: Environment :: X11 Applications :: GTK
+Classifier: Topic :: Text Processing :: Markup
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: odfpy>=1.4.1
+Provides-Extra: gui
+
 # ⚡️ CodexRenderer — ODT/TXT → Markdown → HTML (tema Alacritty/Codex)
 [🌍 English version](README_english-version.md)
 

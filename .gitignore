@@ -1,13 +1,15 @@
+# Python artifacts
 __pycache__/
-*.pyc
-.venv*/ venv*/
-dist/ build/
-*.log
-#!thirdparty/vendor/
-#!thirdparty/tkdnd/
+*.py[cod]
 
-.venv*/
+# Virtual environments
+.venv/
 venv/
+
+# Build outputs
+build/
+dist/
+
+# Local outputs
 out/
-__pycache__/
-*.pyc
+*.log

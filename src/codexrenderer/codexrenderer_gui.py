@@ -635,17 +635,17 @@ class CodexGUI:
         self.btn_run.config(state="normal")
 
 # -------- CLI / Entry point --------
-def parse_cli():
-    p = argparse.ArgumentParser(add_help=False)
-    p.add_argument('--version', '-version', '-v', action='store_true',
-                   help='Muestra la versión y sale')
-    p.add_argument('--debug', action='store_true',
-                   help='Imprime trazas de depuración')
-    args, _ = p.parse_known_args()
-    return args
+def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="codexrenderer-gui",
+        description="Interfaz gráfica drag & drop para CodexRenderer.",
+    )
+    parser.add_argument("--version", "-v", action="store_true", help="Muestra la versión y sale")
+    parser.add_argument("--debug", action="store_true", help="Imprime trazas de depuración")
+    return parser.parse_args(argv)
 
 
-def main(debug: bool = False):
+def _launch_gui(debug: bool = False) -> int:
     if debug:
         print("DEBUG: entrando en main()")
     try:
@@ -657,22 +657,29 @@ def main(debug: bool = False):
         app.root.mainloop()
         if debug:
             print("DEBUG: mainloop() terminó (ventana cerrada)")
-    except Exception as e:
+        return 0
+    except Exception as exc:  # pragma: no cover - feedback gráfico
         import traceback
+
         tb = traceback.format_exc()
         print("ERROR en CodexRenderer GUI:\n", tb, flush=True)
         try:
-            root = tk.Tk(); root.withdraw()
-            messagebox.showerror("CodexRenderer — Error", f"{e}\n\n{tb}")
+            root = tk.Tk()
+            root.withdraw()
+            messagebox.showerror("CodexRenderer — Error", f"{exc}\n\n{tb}")
             root.destroy()
         except Exception:
             pass
-        sys.exit(1)
+        return 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_cli(argv)
+    if args.version:
+        print(f"CodexRenderer GUI {__version__}")
+        return 0
+    return _launch_gui(debug=args.debug)
 
 
 if __name__ == "__main__":
-    args = parse_cli()
-    if args.version:
-        print(f"CodexRenderer GUI {__version__}")
-        sys.exit(0)
-    main(debug=args.debug)
+    raise SystemExit(main())

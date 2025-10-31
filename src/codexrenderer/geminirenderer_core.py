@@ -6,15 +6,13 @@ Provide conversions txt/odt/md -> Gemini-flavoured Markdown -> HTML with embedde
 """
 from __future__ import annotations
 
-import html
-import shlex
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Optional, Tuple
 
-from styles import gemini
+from .styles import gemini
 
 
 def read_plain_txt(path: Path) -> str:

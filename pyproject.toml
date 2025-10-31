@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codexrenderer"
+version = "0.2.0"
+description = "CodexRenderer & GeminiRenderer: ODT/TXT → Markdown/HTML con tema tipo terminal (CLI y GUI)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GPL-3.0-only" }
+authors = [
+  { name = "D4vRAM", email = "d4vram369@proton.me" }
+]
+keywords = ["odt", "markdown", "html", "pandoc", "renderer", "cli", "tkinter", "gui"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  "Environment :: Console",
+  "Environment :: Win32 (MS Windows)",
+  "Environment :: X11 Applications :: GTK",
+  "Topic :: Text Processing :: Markup",
+]
+dependencies = [
+  "odfpy>=1.4.1",
+]
+
+[project.optional-dependencies]
+gui = [
+  # Añade dependencias extra de la GUI aquí si las expones desde PyPI.
+]
+
+[project.urls]
+Homepage = "https://github.com/D4vRAM369/CodexRenderer"
+Issues = "https://github.com/D4vRAM369/CodexRenderer/issues"
+
+[project.scripts]
+codexrenderer = "codexrenderer.cli:main"
+codexrenderer-gui = "codexrenderer.codexrenderer_gui:main"
+geminirenderer = "codexrenderer.gemini_cli:main"
+geminirenderer-gui = "codexrenderer.geminirenderer_gui:main"
+claudecoderenderer = "codexrenderer.claudecode_cli:main"
+claudecoderenderer-gui = "codexrenderer.claudecode_gui:main"
+codex-gemini = "codexrenderer.geminirenderer_gui:main"
+codex-claude = "codexrenderer.claudecode_gui:main"
+
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+codexrenderer = [
+  "assets/*.css",
+  "thirdparty/**/*",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "I", "UP", "B", "W", "C90"]
+ignore = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"

@@ -21,19 +21,28 @@
 
 ```bash
 CodexRenderer/
-├── README.md
-├── requirements.txt
+├── pyproject.toml
 ├── convert_codex.sh
-├── codex_renderer.py
-├── themes/
-│ └── codex.css
-├── samples/
-│ ├── MySession.odt
-│ └── example.txt
-├── .gitignore
-└── .github/ 
-└── workflows/ 
-└── ci.yaml
+├── convert_gemini.sh
+├── run.sh
+├── src/
+│   └── codexrenderer/
+│       ├── cli.py
+│       ├── codex.py
+│       ├── codexrenderer_gui.py
+│       ├── gemini_cli.py
+│       ├── geminirenderer_core.py
+│       ├── geminirenderer_gui.py
+│       ├── assets/
+│       │   └── alacritty.css
+│       └── thirdparty/
+│           └── tkdnd/ …
+├── tests/
+│   ├── test_cli.py
+│   └── test_gui_import.py
+└── .github/workflows/
+    ├── ci.yml
+    └── release.yml
 ```
 
 ---
@@ -70,17 +79,21 @@ sudo apt install -y pandoc
 
 ```bash
 cd ~/CodexRenderer
-python3 -m venv venv
-source venv/bin/activate
-pip install -U pip odfpy
-sudo apt install -y pandoc
-chmod +x convert_codex.sh
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[gui]"
+sudo apt install -y pandoc  # required to render HTML
 ```
 
-> 💡 You can also use `requirements.txt`:
-> ```bash
-> pip install -r requirements.txt
-> ```
+Available commands after the editable install:
+
+```bash
+codexrenderer --help           # CLI ODT/TXT/MD → MD/HTML
+geminirenderer --help          # Gemini-style CLI
+geminirenderer-gui --debug     # Drag & drop GUI
+codexrenderer-gui --debug      # Classic Codex GUI
+```
 
 ---
 

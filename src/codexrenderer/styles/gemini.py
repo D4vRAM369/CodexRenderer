@@ -134,11 +134,84 @@ code {
   line-height: 1.5;
   background: transparent;
   border: 1px solid transparent;
+  overflow-x: auto;
 }
 .panel-line:first-child { margin-top: 0; }
 .panel-line:last-child { margin-bottom: 0; }
 .panel-line.empty {
   min-height: 0.9rem;
+}
+.panel-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.4rem 0;
+}
+.panel-grid .panel-row {
+  display: grid;
+  gap: 0.55rem;
+}
+.panel-grid.cols-2 .panel-row {
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+}
+.panel-grid.cols-3 .panel-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.panel-grid.cols-4 .panel-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.panel-grid.cols-auto .panel-row {
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+}
+.panel-grid .panel-cell {
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(31, 39, 64, 0.45);
+  background: rgba(26, 34, 54, 0.45);
+  white-space: pre;
+  font-family: inherit;
+  color: var(--fg);
+  box-shadow: inset 0 0 0 1px rgba(31, 39, 64, 0.2);
+}
+pre code.code-diff {
+  display: block;
+  background: rgba(21, 28, 46, 0.65);
+  border: 1px solid rgba(49, 70, 120, 0.35);
+  border-radius: 12px;
+  padding: 0.48rem 0.35rem;
+  margin: 1.5rem 0;
+  box-shadow: inset 0 0 0 1px rgba(49, 70, 120, 0.18);
+}
+pre code.code-diff .diff-line {
+  display: inline;
+  white-space: pre-wrap;
+  padding: 0;
+  border-radius: 0;
+  margin: 0;
+  line-height: inherit;
+  color: var(--fg);
+}
+pre code.code-diff .diff-line::after {
+  content: "\\A";
+  white-space: pre;
+}
+pre code.code-diff .diff-add {
+  background: var(--diff-add-bg);
+  color: var(--fg);
+}
+pre code.code-diff .diff-del {
+  background: var(--diff-del-bg);
+  color: var(--fg);
+}
+pre code.code-diff .diff-meta {
+  background: rgba(122, 168, 255, 0.15);
+  color: var(--accent-blue);
+  font-style: italic;
+}
+pre code.code-diff .diff-blank {
+  min-height: 0.42rem;
+  padding-top: 0.22rem;
+  padding-bottom: 0.22rem;
 }
 .panel-diff .panel-line.diff-add {
   background: var(--diff-add-bg);
@@ -173,9 +246,11 @@ blockquote {
   color: var(--muted);
 }
 table {
-  width: 100%;
+  width: 100% !important;
+  max-width: 100%;
   border-collapse: collapse;
   margin: 1.5rem 0;
+  table-layout: auto;
 }
 th, td {
   border: 1px solid var(--panel-border);
@@ -216,6 +291,10 @@ def to_markdown_gemini(src: str, title: str = "GEMINI") -> str:
     i = 0
     in_fence = False
     skipping_ascii_art = True
+    panel_top_chars = ("╭", "┌", "┏", "╔")
+    panel_bottom_chars = ("╰", "└", "┗", "╚")
+    panel_vertical_chars = ("│", "┃", "║")
+    panel_joint_chars = ("├", "┝", "┠", "╞", "╟", "╪", "╫", "┣", "┡", "┢", "╠", "╬")
 
     def is_fence(s: str) -> bool:
         return s.strip().startswith("```")
@@ -266,44 +345,69 @@ def to_markdown_gemini(src: str, title: str = "GEMINI") -> str:
         return False
 
     def render_panel(box_lines: List[str]) -> str:
-        cleaned = [strip_ansi(line) for line in box_lines]
-        if len(cleaned) >= 2 and cleaned[0].startswith(("╭", "┌")) and cleaned[-1].startswith(("╰", "└")):
-            rows: List[str] = []
-            buffer = ""
+        cleaned = [strip_ansi(line).rstrip("\n") for line in box_lines]
+        rows_joined: List[str] = []
+
+        if (
+            len(cleaned) >= 2
+            and cleaned[0].lstrip().startswith(panel_top_chars)
+            and cleaned[-1].lstrip().startswith(panel_bottom_chars)
+        ):
+            current = ""
             for raw in cleaned[1:-1]:
-                segment = raw
-                if segment.startswith("│"):
+                trimmed = raw.lstrip()
+                if not trimmed:
+                    continue
+                if trimmed.startswith(panel_joint_chars):
+                    continue
+                segment = trimmed
+                if segment[:1] in panel_vertical_chars:
                     segment = segment[1:]
-                if segment.endswith("│"):
+                end_marker = False
+                if segment.endswith(panel_vertical_chars):
                     segment = segment[:-1]
-                    buffer += segment
-                    candidate = buffer.rstrip()
+                    end_marker = True
+                current += segment
+                if end_marker:
+                    candidate = current.rstrip()
                     if candidate:
-                        rows.append(candidate)
-                    buffer = ""
-                else:
-                    if segment.strip():
-                        buffer += segment + " "
-                    else:
-                        if buffer:
-                            rows.append(buffer.rstrip())
-                            buffer = ""
-            if buffer.rstrip():
-                rows.append(buffer.rstrip())
-            inner = rows
+                        rows_joined.append(candidate)
+                    current = ""
+            if current.rstrip():
+                rows_joined.append(current.rstrip())
         else:
-            inner = cleaned
+            rows_joined = [line.rstrip() for line in cleaned if line.strip()]
+
+        parsed_rows: List[List[str]] = []
+        for row in rows_joined:
+            if not row:
+                continue
+            parts = None
+            for separator in panel_vertical_chars:
+                if separator in row:
+                    parts = row.split(separator)
+                    break
+            if parts is None:
+                parts = [row]
+            parsed_rows.append([part.rstrip() for part in parts])
+
+        if not parsed_rows:
+            parsed_rows = [[line.strip()] for line in cleaned if line.strip()]
 
         title_text = ""
-        body_lines: List[str] = []
-        for entry in inner:
-            if not title_text:
-                if entry.strip():
-                    title_text = entry.strip()
+        body_rows: List[List[str]] = []
+        for cells in parsed_rows:
+            candidate = ""
+            for cell in cells:
+                stripped_cell = cell.strip()
+                if stripped_cell:
+                    candidate = stripped_cell
+                    break
+            if not title_text and candidate:
+                title_text = candidate
                 continue
-            if not body_lines and entry.strip() == "":
-                continue
-            body_lines.append(entry)
+            if any(cell.strip() for cell in cells):
+                body_rows.append(cells)
 
         classes: List[str] = ["panel"]
         title_lower = title_text.lower()
@@ -317,26 +421,56 @@ def to_markdown_gemini(src: str, title: str = "GEMINI") -> str:
         html_parts: List[str] = [f'<div class="{" ".join(classes)}">']
         if title_text:
             html_parts.append(f'<div class="panel-title">{html.escape(title_text)}</div>')
-        if body_lines:
+
+        if body_rows:
+            max_cols = max(len(row) for row in body_rows)
+            use_grid = max_cols > 1
             html_parts.append('<div class="panel-body">')
-            for raw in body_lines:
-                raw_clean = strip_ansi(raw.rstrip())
-                if not raw_clean.strip():
-                    continue
-                trimmed_numeric = raw_clean.lstrip(" 0123456789")
-                line_cls = "panel-line"
-                if trimmed_numeric.startswith("+"):
-                    line_cls += " diff-add"
-                elif trimmed_numeric.startswith("-"):
-                    if "panel-command" in classes and trimmed_numeric.startswith("- "):
-                        line_cls += " cmd"
-                    else:
-                        line_cls += " diff-del"
-                elif trimmed_numeric.startswith("@@") or trimmed_numeric.startswith("diff --") or trimmed_numeric.startswith("index "):
-                    line_cls += " diff-meta"
-                elif trimmed_numeric.startswith(("---", "+++", "? ", "~ ")):
-                    line_cls += " diff-meta"
-                html_parts.append(f'<div class="{line_cls}">{html.escape(raw_clean)}</div>')
+            if use_grid:
+                grid_class = f'panel-grid cols-{max_cols}' if max_cols <= 4 else "panel-grid cols-auto"
+                html_parts.append(f'<div class="{grid_class}">')
+                for row in body_rows:
+                    padded = row + [""] * (max_cols - len(row))
+                    if not any(cell.strip() for cell in padded):
+                        continue
+                    html_parts.append('<div class="panel-row">')
+                    for idx_cell, cell in enumerate(padded):
+                        text = cell.rstrip()
+                        if idx_cell > 0:
+                            text = text.lstrip()
+                        cell_html = html.escape(text) if text else "&nbsp;"
+                        html_parts.append(f'<div class="panel-cell">{cell_html}</div>')
+                    html_parts.append("</div>")
+                html_parts.append("</div>")
+            else:
+                is_code_panel = "panel-diff" in classes or any(
+                    row and row[0].lstrip(" 0123456789").startswith(("+", "-"))
+                    for row in body_rows
+                )
+
+                if is_code_panel:
+                    code_lines: list[str] = []
+                    for row in body_rows:
+                        text = row[0].rstrip()
+                        if not text.strip():
+                            code_lines.append("")
+                            continue
+                        trimmed_numeric = text.lstrip(" 0123456789")
+                        if trimmed_numeric.startswith(("+", "-")):
+                            num_prefix = text[:len(text) - len(trimmed_numeric)]
+                            display_text = num_prefix + trimmed_numeric[1:]
+                        else:
+                            display_text = text
+                        code_lines.append(display_text)
+
+                    code_block = "\n".join(code_lines)
+                    html_parts.append(f'<pre><code>{html.escape(code_block)}</code></pre>')
+                else:
+                    for row in body_rows:
+                        text = row[0].rstrip()
+                        if not text.strip():
+                            continue
+                        html_parts.append(f'<div class="panel-line">{html.escape(text)}</div>')
             html_parts.append("</div>")
         html_parts.append("</div>")
         return "\n".join(html_parts)
@@ -346,7 +480,7 @@ def to_markdown_gemini(src: str, title: str = "GEMINI") -> str:
         idx = start + 1
         while idx < total:
             box.append(lines[idx])
-            if lines[idx].startswith(("╰", "└")):
+            if strip_ansi(lines[idx]).lstrip().startswith(panel_bottom_chars):
                 idx += 1
                 break
             idx += 1
@@ -422,7 +556,7 @@ def to_markdown_gemini(src: str, title: str = "GEMINI") -> str:
             i += 1
             continue
 
-        if raw_line.startswith(("╭", "┌")):
+        if raw_line.lstrip().startswith(panel_top_chars):
             panel_html, i = consume_panel(i)
             out.append(panel_html)
             continue
@@ -441,7 +575,7 @@ def to_markdown_gemini(src: str, title: str = "GEMINI") -> str:
                     block.append("")
                     i += 1
                     break
-                if nxt_raw.lstrip().startswith(("╭", "┌", "✦", "•", ">")):
+                if nxt_raw.lstrip().startswith(panel_top_chars + ("✦", "•", ">")):
                     break
                 block.append(lines[i])
                 i += 1
@@ -457,11 +591,32 @@ def to_markdown_gemini(src: str, title: str = "GEMINI") -> str:
                     block.append("")
                     i += 1
                     break
-                if nxt_raw.lstrip().startswith(("╭", "┌", "✦", "•", ">")):
+                if nxt_raw.lstrip().startswith(panel_top_chars + ("✦", "•", ">")):
                     break
                 block.append(lines[i])
                 i += 1
             out.append(render_thought(block))
+            continue
+
+        if raw_line.startswith(("+", "-")) and not raw_line.startswith(("++", "--")):
+            block = []
+            while i < total:
+                current = strip_ansi(lines[i])
+                if not current.strip():
+                    i += 1
+                    break
+                if current.startswith(("+", "-")) and not current.startswith(("++", "--")):
+                    cleaned = current[1:]
+                    block.append(cleaned)
+                    i += 1
+                else:
+                    break
+            while block and not block[-1].strip():
+                block.pop()
+            if block:
+                out.append("```")
+                out.extend(block)
+                out.append("```")
             continue
 
         if looks_like_code_line(line):
@@ -490,11 +645,149 @@ def to_markdown_gemini(src: str, title: str = "GEMINI") -> str:
     return md
 
 # ---------- enriquecimiento específico para HTML (kotlin) ----------
-def postprocess_html_for_kotlin(html_str:str)->str:
+_DIFF_FENCE_MARKERS = ("+", "-", "@@", "diff --", "index ", "---", "+++", "? ", "~ ")
+
+
+def _highlight_diff_code_blocks(html_str: str) -> str:
+    def _classify(line: str) -> str | None:
+        trimmed = line.lstrip()
+        if not trimmed:
+            return "blank"
+        idx = 0
+        while idx < len(trimmed) and trimmed[idx].isdigit():
+            idx += 1
+        remainder = trimmed[idx:].lstrip()
+        if not remainder:
+            return "blank"
+        if remainder.startswith("+"):
+            return "add"
+        if remainder.startswith("-"):
+            return "del"
+        if remainder.startswith(_DIFF_FENCE_MARKERS[2:]):
+            return "meta"
+        return None
+
+    def _decorate(attrs: str, body: str) -> str | None:
+        if "code-kotlin" in attrs or "code-diff" in attrs:
+            return None
+        raw = html.unescape(body)
+        if "\n" in raw:
+            lines = raw.split("\n")
+        else:
+            lines = re.split(r' (?=\d+\s+[+\-]?)', raw)
+        if not any(_classify(line) in {"add", "del", "meta"} for line in lines):
+            return None
+        decorated: list[str] = []
+        for line in lines:
+            kind = _classify(line)
+            classes: list[str] = ["diff-line"]
+            if kind == "add":
+                classes.append("diff-add")
+            elif kind == "del":
+                classes.append("diff-del")
+            elif kind == "meta":
+                classes.append("diff-meta")
+            elif kind == "blank":
+                classes.append("diff-blank")
+            working = line.rstrip("\r")
+            num_match = re.match(r"\s*\d+\s*(.*)", working)
+            if num_match:
+                working = num_match.group(1)
+
+            if kind in ("add", "del") and working and working[0] in ("+", "-"):
+                working = working[1:]
+
+            content = working
+            content_html = html.escape(content, quote=False) if content else "&nbsp;"
+            decorated.append(f'<span class="{" ".join(classes)}">{content_html}</span>')
+        attrs_out = attrs
+        if "class=" in attrs_out:
+            attrs_out = re.sub(
+                r'class="([^"]*)"',
+                lambda m: f'class="{m.group(1)} code-diff"',
+                attrs_out,
+                count=1,
+            )
+        else:
+            attrs_out += ' class="code-diff"'
+        return "<code" + attrs_out + ">" + "\n".join(decorated) + "</code>"
+
+    def _repl_block(match: re.Match[str]) -> str:
+        attrs = match.group(1) or ""
+        body = match.group(2)
+        decorated = _decorate(attrs, body)
+        if decorated is None:
+            return match.group(0)
+        return "<pre>" + decorated + "</pre>"
+
+    def _repl_inline(match: re.Match[str]) -> str:
+        attrs = match.group(1) or ""
+        body = match.group(2)
+        decorated = _decorate(attrs, body)
+        if decorated is None:
+            return match.group(0)
+        return "<pre>" + decorated + "</pre>"
+
+    html_str = re.sub(r"<pre><code([^>]*)>(.*?)</code></pre>", _repl_block, html_str, flags=re.S)
+    return re.sub(r"<code([^>]*)>(.*?)</code>", _repl_inline, html_str, flags=re.S)
+
+
+def _remove_line_numbers_from_code(html_str: str) -> str:
+    """
+    Extrae números de línea del código y los pone en spans no copiables.
+    Procesa tanto texto plano como spans existentes.
+    """
+    def _process_code_block(match: re.Match[str]) -> str:
+        tag_open = match.group(1)
+        content = match.group(2)
+        tag_close = match.group(3)
+
+        if '<span' in content:
+            content = re.sub(
+                r'<span class="diff-line([^"]*)">\s*(\d+)\s+([+\-])?(.*?)</span>',
+                lambda m: (
+                    f'<span class="diff-line{m.group(1)}">'
+                    f'<span class="line-num" style="user-select: none;">{m.group(2)} {m.group(3) or ""}</span>'
+                    f'{m.group(4)}</span>'
+                ),
+                content
+            )
+        else:
+            unescaped = html.unescape(content)
+            lines = unescaped.split('\n')
+            processed_lines: list[str] = []
+
+            for line in lines:
+                line_match = re.match(r'^(\s*)(\d+)\s+([+\-])?(.*)$', line)
+                if line_match:
+                    indent = line_match.group(1)
+                    linenum = line_match.group(2)
+                    marker = line_match.group(3) or ''
+                    code = line_match.group(4)
+                    processed_line = f'{indent}<span class="line-num" style="user-select: none;">{linenum} {marker}</span>{html.escape(code) if code else ""}'
+                    processed_lines.append(processed_line)
+                else:
+                    processed_lines.append(html.escape(line))
+
+            content = '\n'.join(processed_lines)
+
+        return f'{tag_open}{content}{tag_close}'
+
+    return re.sub(
+        r'(<pre><code[^>]*>)(.*?)(</code></pre>)',
+        _process_code_block,
+        html_str,
+        flags=re.S
+    )
+
+def postprocess_html_for_kotlin(html_str: str) -> str:
     """
     Dentro de <pre><code class="language-kotlin">...</code></pre>
     aplica coloreado básico mediante spans (kw, lit, type).
     """
+    html_str = _highlight_diff_code_blocks(html_str)
+    html_str = _remove_line_numbers_from_code(html_str)
+
     def _repl(m):
         inner = m.group(1)
         return '<pre><code class="language-kotlin code-kotlin">' + _colorize_kotlin(inner) + "</code></pre>"
