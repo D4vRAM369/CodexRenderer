@@ -1,6 +1,8 @@
 [console_scripts]
 claudecoderenderer = codexrenderer.claudecode_cli:main
 claudecoderenderer-gui = codexrenderer.claudecode_gui:main
+codex-claude = codexrenderer.claudecode_gui:main
+codex-gemini = codexrenderer.geminirenderer_gui:main
 codexrenderer = codexrenderer.cli:main
 codexrenderer-gui = codexrenderer.codexrenderer_gui:main
 geminirenderer = codexrenderer.gemini_cli:main

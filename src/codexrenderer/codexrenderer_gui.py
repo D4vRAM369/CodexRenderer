@@ -14,13 +14,15 @@ import argparse
 from pathlib import Path
 from typing import List, Optional
 
+from . import __version__ as PACKAGE_VERSION
+
 # CodexRenderer GUI — ODT/TXT -> Markdown -> HTML con tema Alacritty/Codex (drag & drop)
 # Requisitos:
 #   - Python 3.10+
 #   - odfpy (para .odt):  pip install odfpy
 #   - pandoc (sistema):   sudo apt install -y pandoc
 #   - (Opcional) tkinterdnd2 para drag&drop nativo: pip install tkinterdnd2
-__version__ = "0.1.1"
+__version__ = PACKAGE_VERSION
 
 # ---------------------------------------------------------------------------
 # TKDND bootstrap (soporta layout 'thirdparty/tkdnd/<platform-arch>/tkdnd.tcl')

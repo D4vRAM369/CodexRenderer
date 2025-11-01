@@ -1,3 +1,4 @@
+LICENSE
 README.md
 pyproject.toml
 src/codexrenderer/__init__.py
@@ -10,6 +11,7 @@ src/codexrenderer/codexrenderer_gui.py
 src/codexrenderer/gemini_cli.py
 src/codexrenderer/geminirenderer_core.py
 src/codexrenderer/geminirenderer_gui.py
+src/codexrenderer/launcher.py
 src/codexrenderer.egg-info/PKG-INFO
 src/codexrenderer.egg-info/SOURCES.txt
 src/codexrenderer.egg-info/dependency_links.txt

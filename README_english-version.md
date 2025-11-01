@@ -95,6 +95,10 @@ geminirenderer-gui --debug     # Drag & drop GUI
 codexrenderer-gui --debug      # Classic Codex GUI
 ```
 
+### Handy CLI options
+- `--md-only`: produces just the Markdown file (ideal when Pandoc is not present).
+- `--inline-css/--no-inline-css`: toggle embedding the theme CSS at the top of the Markdown output.
+
 ---
 
 ## 🚀 Quick use
@@ -150,6 +154,10 @@ find ./notes -type f \( -name '*.odt' -o -name '*.txt' \) -print0 \
 
 **CodexRenderer** is licensed under [GNU GPL v3.0](./LICENSE).
 This ensures that it remains **free software**, allowing forks, improvements and educational use without code closure.
+
+**Bundled third-party components**
+- `tkinterdnd2` (vendored for the GUI) – see `src/codexrenderer/thirdparty/vendor/tkinterdnd2-0.4.3.dist-info/LICENSE`.
+- TkDND native binaries for drag & drop – redistributed under their original license in `src/codexrenderer/thirdparty/tkdnd/`.
 
 ---
 

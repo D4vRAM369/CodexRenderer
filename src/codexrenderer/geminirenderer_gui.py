@@ -23,6 +23,7 @@ import threading
 from typing import List, Optional
 
 # Proyecto
+from . import __version__ as PACKAGE_VERSION
 from .geminirenderer_core import convert_path, ensure_pandoc
 
 # ============================================================================
@@ -391,7 +392,7 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-__version__ = "0.1.0"
+__version__ = PACKAGE_VERSION
 
 
 def _launch_gui(debug: bool = False) -> int:

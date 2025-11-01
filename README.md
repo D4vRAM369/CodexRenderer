@@ -124,6 +124,10 @@ geminirenderer-gui --debug     # GUI con drag & drop
 codexrenderer-gui --debug      # GUI clásica (Codex)
 ```
 
+### Opciones CLI útiles
+- `--md-only`: crea únicamente el `.md` (útil en entornos sin Pandoc instalado).
+- `--inline-css/--no-inline-css`: controla si el CSS del tema se embebe al inicio del Markdown.
+
 ---
 
 ## 🚀 Uso rápido
@@ -179,6 +183,33 @@ find ./notas -type f \( -name '*.odt' -o -name '*.txt' \) -print0 \
 
 **CodexRenderer** está licenciado bajo [GNU GPL v3.0](./LICENSE).  
 Esto garantiza que siga siendo **software libre**, permitiendo forks, mejoras y uso educativo sin cierre de código.
+
+**Componentes de terceros incluidos**
+- `tkinterdnd2` (vendorizado para la GUI): licencia en `src/codexrenderer/thirdparty/vendor/tkinterdnd2-0.4.3.dist-info/LICENSE`.
+- TkDND (binarios nativos para arrastrar y soltar): archivos redistribuidos en `src/codexrenderer/thirdparty/tkdnd/` siguiendo su licencia original.
+
+---
+
+## 🚢 Checklist previa a un release
+
+Para publicar una nueva versión en GitHub y PyPI:
+
+1. Actualiza `pyproject.toml` y cualquier banner en el código con el número de versión deseado.
+2. Instala dependencias de desarrollo y ejecuta la verificación completa:
+   ```bash
+   python -m pip install -e ".[gui]" pytest ruff black build twine
+   ruff check .
+   black --check .
+   pytest
+   ```
+3. Genera los artefactos y valida metadatos:
+   ```bash
+   python -m build
+   twine check dist/*
+   ```
+4. Haz commit de los cambios relevantes (evita subir `venv/`, `out/` o binarios temporales).
+5. Etiqueta la versión (`git tag vX.Y.Z && git push --tags`) para disparar el workflow `release.yml`.
+6. Revisa el draft automáticamente creado en GitHub Releases y añade notas de cambios antes de publicarlo.
 
 ---
 

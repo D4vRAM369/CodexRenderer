@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=68", "wheel", "packaging>=24", "virtualenv>=20"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,7 @@ version = "0.2.0"
 description = "CodexRenderer & GeminiRenderer: ODT/TXT → Markdown/HTML con tema tipo terminal (CLI y GUI)."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "GPL-3.0-only" }
+license = { file = "LICENSE" }
 authors = [
   { name = "D4vRAM", email = "d4vram369@proton.me" }
 ]
@@ -27,7 +27,7 @@ dependencies = [
 
 [project.optional-dependencies]
 gui = [
-  # Añade dependencias extra de la GUI aquí si las expones desde PyPI.
+  "tkinterdnd2>=0.4.2",
 ]
 
 [project.urls]

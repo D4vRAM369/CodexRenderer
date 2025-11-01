@@ -25,6 +25,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 # Proyecto
+from . import __version__ as PACKAGE_VERSION
 from codexrenderer.claudecode_core import convert_path
 from codexrenderer.geminirenderer_core import ensure_pandoc
 
@@ -513,7 +514,7 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-__version__ = "0.1.0"
+__version__ = PACKAGE_VERSION
 
 
 def _launch_gui(debug: bool = False) -> int:
