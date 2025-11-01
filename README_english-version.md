@@ -63,6 +63,27 @@ The **CSS is embedded directly** into the final HTML, guaranteeing the same appe
 
 ---
 
+## 🌠 Extension: GeminiRenderer GUI
+
+**GeminiRenderer** is the visual evolution of CodexRenderer, with a graphical interface (Tkinter + tkinterdnd2).
+
+It allows you to convert via *Drag & Drop* or multiple selection (`.txt`, `.md`, `.odt`) to Markdown + HTML with the same **Codex/Alacritty** theme.
+
+ ```bash
+./run.sh --debug
+
+📦 Additional Requirements:
+
+sudo apt install -y python3-tk tkdnd pandoc
+
+🧩 Vendorized Dependencies:
+
+thirdparty/vendor/tkinterdnd2/
+
+thirdparty/tkdnd/linux-x64/
+
+---
+
 ## ⚙️ Requirements
 
 - 🐍 **Python 3.10+**
