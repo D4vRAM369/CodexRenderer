@@ -14,7 +14,7 @@
 
 ---
 
-## 🖼️ Ejemplos visuales 
+## 🖼️ Ejemplos visuales
 
 Capturas de un archivo `sample.odt` procesado por **CodexRenderer**, mostrando el resultado final en HTML oscuro estilo Alacritty.
 
@@ -27,9 +27,13 @@ Capturas de un archivo `sample.odt` procesado por **CodexRenderer**, mostrando e
 
 ```bash
 CodexRenderer/
-├── pyproject.toml
+├── CodexRunner.spec
+├── cli_entry.py
 ├── convert_codex.sh
 ├── convert_gemini.sh
+├── gui_entry.py
+├── pyproject.toml
+├── requirements.txt
 ├── run.sh
 ├── src/
 │   └── codexrenderer/
@@ -40,13 +44,22 @@ CodexRenderer/
 │       ├── gemini_cli.py
 │       ├── geminirenderer_core.py
 │       ├── geminirenderer_gui.py
+│       ├── claudecode_cli.py
+│       ├── claudecode_gui.py
 │       ├── assets/
 │       │   └── alacritty.css
 │       └── thirdparty/
-│           └── tkdnd/ … (vendorizado)
+│           ├── tkdnd/ …
+│           └── vendor/
+│               └── tkinterdnd2/ …
+├── thirdparty/
+│   └── vendor/
+│       └── tkinterdnd2/ …
 ├── tests/
 │   ├── test_cli.py
 │   └── test_gui_import.py
+├── build/
+├── dist/
 └── .github/workflows/
     ├── ci.yml
     └── release.yml
@@ -56,41 +69,46 @@ CodexRenderer/
 
 ## 🧉 Descripción
 
-CodexRenderer **renderiza notas/sesiones** a HTML con un tema visual basado en la Terminal *Alacritty*.  
-Aplica reglas semánticas automáticas sobre el texto plano o documentos `.odt` para resaltar contenido según su función:
+CodexRenderer **renderiza notas/sesiones** a HTML con un tema visual basado en la terminal *Alacritty*.  
+Aplica reglas semánticas automáticas sobre texto plano o documentos `.odt` para resaltar contenido según su función:
 
-| Tipo de línea | Ejemplo | Renderizado |
-|----------------|----------|-------------|
-| 🧠 **Pensamientos IA** (`•`) | `• esto es una idea interna` | *Verde + cursiva* |
-| 🟩 **Líneas añadidas** (`+`) | `+ nueva línea añadida` | Bloque `diff` verde |
-| 🔴 **Líneas eliminadas** (`-`) | `- línea eliminada` | Bloque `diff` rojo |
-| 💻 **Bloques de código** | `````bash ... ````` | Tema oscuro estilo terminal |
+| Tipo de línea              | Ejemplo                          | Renderizado                |
+|----------------------------|----------------------------------|----------------------------|
+| 🧠 **Pensamientos IA** (`•`) | `• esto es una idea interna`      | Verde + cursiva            |
+| 🟩 **Líneas añadidas** (`+`)  | `+ nueva línea añadida`           | Bloque `diff` verde        |
+| 🔴 **Líneas eliminadas** (`-`)| `- línea eliminada`               | Bloque `diff` rojo         |
+| 💻 **Bloques de código**      | `````bash ... `````               | Tema oscuro estilo terminal |
 
 El **CSS se embebe directamente** en el HTML final, garantizando un mismo aspecto en cualquier carpeta o sistema.
 
 ---
 
-## 🌠 Extensión: GeminiRenderer GUI
+## 🌠 Extensiones GUI: GeminiRenderer y ClaudeCode
 
-**GeminiRenderer** es la evolución visual de CodexRenderer, con interfaz gráfica (Tkinter + tkinterdnd2).  
-Permite convertir por *Drag & Drop* o selección múltiple (`.txt`, `.md`, `.odt`) a Markdown + HTML con el mismo tema **Codex/Alacritty**.
+Las GUIs de **GeminiRenderer** y **ClaudeCodeRenderer** amplían la experiencia de CodexRenderer con soporte *drag & drop* y estilos de exportación específicos. Comparten la base Tkinter + tkinterdnd2 vendorizada y se distribuyen junto al lanzador `run.sh`.
+
+- **GeminiRenderer GUI** adapta el flujo Codex al ecosistema Gemini y sirvió como base para la integración multiplataforma de TkDND.
+- **ClaudeCode GUI** reutiliza la misma capa de conversión, añadiendo presets orientados a flujos Claude.
 
 ```bash
-./run.sh --debug
+./run.sh --debug        # Autodetecta GUI disponible y abre GeminiRenderer
+codex-gemini --debug    # Lanza la interfaz Gemini
+codex-claude --debug    # Lanza la interfaz ClaudeCode
+```
 
-📦 Requisitos adicionales:
+📦 Requisitos adicionales (ambas GUIs):
 
+```bash
 sudo apt install -y python3-tk tkdnd pandoc
-
+```
 
 🧩 Dependencias vendorizadas:
 
-thirdparty/vendor/tkinterdnd2/
-
-thirdparty/tkdnd/linux-x64/
+- `src/codexrenderer/thirdparty/vendor/tkinterdnd2/`
+- `src/codexrenderer/thirdparty/tkdnd/<plataforma>/`
+- `thirdparty/vendor/tkinterdnd2/` (soporte fuera de entornos virtuales)
 
 ---
-
 
 ## ⚙️ Requisitos
 
@@ -122,9 +140,14 @@ codexrenderer --help           # CLI ODT/TXT/MD → MD/HTML
 geminirenderer --help          # CLI estilo Gemini
 geminirenderer-gui --debug     # GUI con drag & drop
 codexrenderer-gui --debug      # GUI clásica (Codex)
+claudecoderenderer --help      # CLI estilo Claude
+claudecoderenderer-gui --debug # GUI Claude
+codex-gemini --debug           # Alias lanzador Gemini
+codex-claude --debug           # Alias lanzador Claude
 ```
 
 ### Opciones CLI útiles
+
 - `--md-only`: crea únicamente el `.md` (útil en entornos sin Pandoc instalado).
 - `--inline-css/--no-inline-css`: controla si el CSS del tema se embebe al inicio del Markdown.
 
@@ -133,7 +156,7 @@ codexrenderer-gui --debug      # GUI clásica (Codex)
 ## 🚀 Uso rápido
 
 ```bash
-./convert_codex.sh samples/MiSesion.odt
+./convert_codex.sh ~/Documentos/MiSesion.odt
 ```
 
 Salida generada:
@@ -172,44 +195,53 @@ find ./notas -type f \( -name '*.odt' -o -name '*.txt' \) -print0 \
 
 > 💚 Basado en el estilo limpio de Alacritty, con un toque retro tipo Matrix en el banner.
 
-🖤 Fondo negro profundo  
-💚 Verde neón (`#00ff80`)  
-🧮 Tipografía monoespaciada    
-💿 Código resaltado con bordes luminosos  
+- 🖤 Fondo negro profundo 
+- 💚 Verde neón (`#00ff80`) 
+- 🧮 Tipografía monoespaciada 
+- 💿 Código resaltado con bordes luminosos 
+
+---
+
+## 📦 Empaquetado con PyInstaller (CodexRunner)
+
+```bash
+python -m pip install -r requirements.txt pyinstaller
+pyinstaller CodexRunner.spec --clean --noconfirm
+```
+
+El ejecutable se genera en `dist/CodexRunner/`. Lo habitual es comprimir esa carpeta y adjuntarla como asset en la release correspondiente.
 
 ---
 
 ## 🗟️ Licencia
 
-**CodexRenderer** está licenciado bajo [GNU GPL v3.0](./LICENSE).  
-Esto garantiza que siga siendo **software libre**, permitiendo forks, mejoras y uso educativo sin cierre de código.
+**CodexRenderer** está licenciado bajo [GNU GPL v3.0](./LICENSE), garantizando que siga siendo software libre.
 
 **Componentes de terceros incluidos**
-- `tkinterdnd2` (vendorizado para la GUI): licencia en `src/codexrenderer/thirdparty/vendor/tkinterdnd2-0.4.3.dist-info/LICENSE`.
-- TkDND (binarios nativos para arrastrar y soltar): archivos redistribuidos en `src/codexrenderer/thirdparty/tkdnd/` siguiendo su licencia original.
+- `tkinterdnd2` vendorizado (CLI/GUI y launcher): licencia en `src/codexrenderer/thirdparty/vendor/tkinterdnd2-0.4.3.dist-info/LICENSE`.
+- TkDND (binarios nativos para arrastrar y soltar): archivos redistribuidos en `src/codexrenderer/thirdparty/tkdnd/` y `thirdparty/vendor/tkinterdnd2/tkdnd/` siguiendo su licencia original.
 
 ---
 
 ## 🚢 Checklist previa a un release
 
-Para publicar una nueva versión en GitHub y PyPI:
-
-1. Actualiza `pyproject.toml` y cualquier banner en el código con el número de versión deseado.
-2. Instala dependencias de desarrollo y ejecuta la verificación completa:
+1. Actualizar `pyproject.toml` y cualquier banner con la nueva versión.
+2. Instalar dependencias de desarrollo y ejecutar verificaciones:
    ```bash
    python -m pip install -e ".[gui]" pytest ruff black build twine
    ruff check .
    black --check .
    pytest
    ```
-3. Genera los artefactos y valida metadatos:
+3. Generar artefactos y validar metadatos:
    ```bash
    python -m build
    twine check dist/*
+   pyinstaller CodexRunner.spec --clean --noconfirm
    ```
-4. Haz commit de los cambios relevantes (evita subir `venv/`, `out/` o binarios temporales).
-5. Etiqueta la versión (`git tag vX.Y.Z && git push --tags`) para disparar el workflow `release.yml`.
-6. Revisa el draft automáticamente creado en GitHub Releases y añade notas de cambios antes de publicarlo.
+4. Confirmar los cambios relevantes (evitando `venv/`, `out/` o binarios temporales).
+5. Etiquetar la versión (`git tag vX.Y.Z && git push --tags`) para activar `release.yml`.
+6. Revisar el borrador automático en GitHub Releases y documentar las notas de cambio.
 
 ---
 
