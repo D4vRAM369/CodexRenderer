@@ -1,20 +1,25 @@
 # PyInstaller artefactos
 /dist/
-//build/
+/build/
 /*.zip
 /*.tar.gz
 /*.egg-info/
+
+# Cachés de Python
 __pycache__/
 *.pyc
 
-# entornos
+# Entornos virtuales
 .venv/
 .venv_build/
 .venv_*/
 .venv-*/
 .venv*
+.venv*/
 /venv/
+venv/
+venv*/
 
-# pruebas locales
+# Salidas locales
 /out/
-
+out/
